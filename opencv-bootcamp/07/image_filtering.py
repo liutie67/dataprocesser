@@ -1,6 +1,7 @@
 import cv2
 import sys
 import numpy
+import time
 
 PREVIEW  = 0  # Preview Mode
 BLUR     = 1  # Blurring Filter
@@ -8,10 +9,11 @@ FEATURES = 2  # Corner Feature Detector
 CANNY    = 3  # Canny Edge Detector
 
 feature_params = dict(maxCorners=500, qualityLevel=0.2, minDistance=15, blockSize=9)
+print(feature_params)
 s = 0
 if len(sys.argv) > 1:
     s = sys.argv[1]
-
+s = '/media/liutie/备用盘/video/mdg/default-默认/2025-07-29-23-50-00BV1pC89zmEdA【睡前消息932】杭州水污染 慢一步的真相追不上谣言.mp4'
 image_filter = PREVIEW
 alive = True
 
@@ -20,13 +22,17 @@ cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
 result = None
 
 source = cv2.VideoCapture(s)
+fps = source.get(cv2.CAP_PROP_FPS)  # 获取视频的原始帧率（可选）
+target_fps = fps+3  # 目标帧率（按需调整）
+frame_delay = 1.0 / target_fps  # 每帧的理想间隔时间（秒）
 
 while alive:
+    start_time = time.time()  # 记录开始时间
     has_frame, frame = source.read()
     if not has_frame:
         break
 
-    frame = cv2.flip(frame, 1)
+    # frame = cv2.flip(frame, 1)
 
     if image_filter == PREVIEW:
         result = frame
@@ -43,6 +49,10 @@ while alive:
                 cv2.circle(result, (x, y), 10, (0, 255, 0), 1)
 
     cv2.imshow(win_name, result)
+    # 控制帧率
+    elapsed = time.time() - start_time
+    if elapsed < frame_delay:
+        time.sleep(frame_delay - elapsed)
 
     key = cv2.waitKey(1)
     if key == ord("Q") or key == ord("q") or key == 27:
