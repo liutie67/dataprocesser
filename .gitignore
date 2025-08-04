@@ -1,3 +1,7 @@
 .idea/
 .DS_Store
 .ipynb_checkpoints
+*.mp4
+/opencv-bootcamp/11/opencv_bootcamp_assets_NB11.zip
+/opencv-bootcamp/11/goturn.caffemodel
+/opencv-bootcamp/11/goturn.prototxt
