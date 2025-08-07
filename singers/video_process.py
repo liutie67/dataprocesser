@@ -78,7 +78,7 @@ def combine_video_audio(input_from_convert2x264, input_from_extract_audio, outpu
     video_path = input_from_convert2x264
     audio_path = input_from_extract_audio
     current_dir = os.path.dirname(os.path.realpath(__file__))
-    output_video = os.path.join(current_dir, output_path, input_from_extract_audio.split(os.sep)[-1] + '-final.mp4')
+    output_video = os.path.join(current_dir, output_path, input_from_extract_audio.split(os.sep)[-1].split('.')[0] + '-final.mp4')
     cmd = [
         "ffmpeg",
         "-i", video_path,
