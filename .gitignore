@@ -12,4 +12,7 @@
 /opencv-bootcamp/13/images
 /opencv-bootcamp/14/opencv_bootcamp_assets_NB14.zip
 /opencv-bootcamp/14/model
-
+/singers/videos
+/singers/audios
+*.aac
+__pycache__
