@@ -1,10 +1,10 @@
 import base64
-
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import os
+import hashlib
 
-from key_manager import load_key
+from video_crypt.key_manager import load_key
 
 
 def encrypt_file_with_name(input_path, output_path, key, chunk_size=1024):
@@ -77,6 +77,24 @@ def decrypt_file_with_name(input_path, output_dir, key, chunk_size=1024):
             fout.truncate()
 
 
+def string_to_hash(text: str, length: int = 32) -> str:
+    """
+    将任意字符串转换为固定长度的十六进制哈希值
+    :param text: 输入字符串
+    :param length: 输出长度(字符数)，最大64(SHA-256产生64字符十六进制)
+    :return: 固定长度的哈希字符串
+    """
+    if length > 64:
+        raise ValueError("最大支持64字符(SHA-256)")
+
+    # 创建SHA-256哈希对象
+    sha256 = hashlib.sha256()
+    # 更新哈希对象(自动处理编码)
+    sha256.update(text.encode('utf-8'))
+    # 获取十六进制摘要并截断
+    return sha256.hexdigest()[:length]
+
+
 if __name__ == '__main__':
     import time
 
@@ -89,11 +107,13 @@ if __name__ == '__main__':
     # input_path = '../yolo-process/database/test-d38bc61df8084f119a21bcbbb55d1423.png'
     input_path = '/media/liutie/备用盘/video/mdg/default-默认/2022-07-30-20-48-54BV1Pt4y1V7Wd【海豹故事会】727直播回放，顺着网线来找你.mp4'
 
+    filename = input_path.split('/')[-1].split('.')[0]
+    enc_name = string_to_hash(filename, 16)
     start_time = time.time()
-    encrypt_file_with_name(input_path, 'encrypted/encrypted.bin', key)
+    encrypt_file_with_name(input_path, f'encrypted/encrypted-{enc_name}', key)
     encrypt_time = time.time() - start_time
 
-    decrypt_file_with_name('encrypted/encrypted.bin', 'decrypted', key)
+    decrypt_file_with_name(f'encrypted/encrypted-{enc_name}', 'decrypted', key)
     decrypt_time = time.time() - start_time
 
     file_size = os.path.getsize(input_path) / (1024 * 1024)
