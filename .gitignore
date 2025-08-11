@@ -16,3 +16,6 @@
 /singers/audios
 *.aac
 __pycache__
+*.aes
+*.png
+*.bin
