@@ -20,3 +20,4 @@ __pycache__
 *.png
 *.bin
 /video_crypt/decrypted
+/video_crypt/encrypted
