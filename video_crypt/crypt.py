@@ -2,9 +2,9 @@ import base64
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import os
-import hashlib
 
 from video_crypt.key_manager import load_key
+from video_crypt.utils import string_to_hash
 
 
 def encrypt_file_with_name(input_path, output_path, key, chunk_size=1024):
@@ -77,22 +77,52 @@ def decrypt_file_with_name(input_path, output_dir, key, chunk_size=1024):
             fout.truncate()
 
 
-def string_to_hash(text: str, length: int = 32) -> str:
+def encrypt_folder_name(folder_name, key):
     """
-    将任意字符串转换为固定长度的十六进制哈希值
-    :param text: 输入字符串
-    :param length: 输出长度(字符数)，最大64(SHA-256产生64字符十六进制)
-    :return: 固定长度的哈希字符串
+    加密文件夹名称（使用随机IV）
+    :param key: 32字节AES密钥
+    :param folder_name: 要加密的文件夹名
+    :return: 固定长度的安全Base64字符串（无等号，特殊字符已替换）
     """
-    if length > 64:
-        raise ValueError("最大支持64字符(SHA-256)")
+    # 生成随机IV
+    iv = os.urandom(AES.block_size)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
 
-    # 创建SHA-256哈希对象
-    sha256 = hashlib.sha256()
-    # 更新哈希对象(自动处理编码)
-    sha256.update(text.encode('utf-8'))
-    # 获取十六进制摘要并截断
-    return sha256.hexdigest()[:length]
+    # 加密并添加填充
+    encrypted = cipher.encrypt(pad(folder_name.encode('utf-8'), AES.block_size))
+
+    # 组合IV和密文
+    combined = iv + encrypted
+
+    # Base64编码并做安全替换
+    b64_str = base64.b64encode(combined).decode('utf-8')
+    safe_str = b64_str.replace('+', '-').replace('/', '_').rstrip('=')
+
+    return safe_str  # 示例: "7HX9v2Jk4PZRmnBcKtEySQABcdEfghIj"
+
+
+def decrypt_folder_name(encrypted_str, key):
+    """
+    解密文件夹名称
+    :param key: 32字节AES密钥
+    :param encrypted_str: encrypt_folder_name()返回的字符串
+    :return: 原始文件夹名
+    """
+    # 还原Base64特殊字符和填充
+    restored = encrypted_str.replace('-', '+').replace('_', '/')
+    # 计算需要补足的等号数量（Base64长度需为4的倍数）
+    padding = '=' * (4 - len(restored) % 4)
+    combined = base64.b64decode(restored + padding)
+
+    # 分离IV和密文
+    iv = combined[:AES.block_size]
+    encrypted = combined[AES.block_size:]
+
+    # 解密
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    decrypted = unpad(cipher.decrypt(encrypted), AES.block_size)
+
+    return decrypted.decode('utf-8')
 
 
 if __name__ == '__main__':
