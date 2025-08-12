@@ -41,6 +41,8 @@ def copy_with_fixed_random_suffix(src_dir, dst_dir, encrypt=True):
 
             # 处理文件
             for f in files:
+                if f.startswith("."):
+                    continue
                 # name, ext = os.path.splitext(f)
                 new_name = string_to_hash(f)
                 src_file = os.path.join(root, f)
@@ -54,15 +56,13 @@ def copy_with_fixed_random_suffix(src_dir, dst_dir, encrypt=True):
 
 if __name__ == "__main__":
     # 设置源目录和目标目录
-    source_directory = 'encrypted'
-    target_directory = 'decrypted'
-
-    # 验证源目录是否存在
-    if not os.path.isdir(source_directory):
-        print(f"错误: 源目录 '{source_directory}' 不存在!")
-        exit(1)
-
-    # 调用函数处理
+    source_directory = '/some/path'
+    target_directory = '/some/path'
     copy_with_fixed_random_suffix(source_directory, target_directory)
-    copy_with_fixed_random_suffix(target_directory, 'back_decrypted', encrypt=False)
+
+    # 设置源目录和目标目录
+    source_directory = '/some/path'
+    target_directory = '/some/path'
+    copy_with_fixed_random_suffix(source_directory, target_directory, encrypt=False)
+
     print("处理完成!")
