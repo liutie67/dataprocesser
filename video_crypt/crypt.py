@@ -89,6 +89,8 @@ def encrypt_folder_name(folder_name, key):
     cipher = AES.new(key, AES.MODE_CBC, iv)
 
     # 加密并添加填充
+    if len(folder_name) > 30:
+        folder_name = folder_name[:30]
     encrypted = cipher.encrypt(pad(folder_name.encode('utf-8'), AES.block_size))
 
     # 组合IV和密文
