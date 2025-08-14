@@ -22,3 +22,5 @@ __pycache__
 /video_crypt/decrypted
 /video_crypt/encrypted
 local_launchpad.py
+/video_crypt/2decrypt
+/video_crypt/2encrypt
