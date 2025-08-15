@@ -32,11 +32,20 @@ def copy_with_fixed_random_suffix(
     # 如果需要保存映射，生成映射目录路径
     mapping_root = dst_dir  # + "_mapping" if save_mapping else None
 
+    def count_valid_tasks(src_dir):
+        total_tasks = 0
+        for root, dirs, files in os.walk(src_dir):
+            # 关键修改：原地移除所有含@的目录，阻止os.walk进入这些目录
+            dirs[:] = [d for d in dirs if '@' not in d]
+
+            # 统计当前目录的有效内容（已过滤掉@目录）
+            valid_dirs = len(dirs)  # 因为dirs已经被过滤，直接取长度即可
+            valid_files = len([f for f in files if not f.startswith('.')])
+            total_tasks += valid_dirs + valid_files
+
+        return total_tasks
     # 统计总任务数（排除隐藏文件）
-    total_tasks = sum(
-        len(dirs) + len([f for f in files if not f.startswith(".")])
-        for _, dirs, files in os.walk(src_dir)
-    )
+    total_tasks = count_valid_tasks(src_dir)
 
     def process_file(src_file, dst_file, encrypt, delete_source, map_dir, orig_name, enc_name):
         """单个文件处理函数"""
@@ -58,6 +67,8 @@ def copy_with_fixed_random_suffix(
 
     with tqdm(total=total_tasks, desc="Processing", unit="item") as pbar:
         for root, dirs, files in os.walk(src_dir):
+            dirs[:] = [d for d in dirs if '@' not in d]
+
             # 处理目录
             if root == src_dir:
                 new_root = dst_dir
