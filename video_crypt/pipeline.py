@@ -1,8 +1,10 @@
 import os
+import shutil
+
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
-from video_preview.generate_video_preview import generate_video_preview
+from video_preview.generate_video_preview import generate_video_preview, is_video_file
 
 from video_crypt.crypt import encrypt_folder_name, decrypt_folder_name, encrypt_file_with_name, decrypt_file_with_name
 from video_crypt.key_manager import load_key
@@ -14,13 +16,14 @@ def copy_with_fixed_random_suffix(
         dst_dir,
         encrypt=True,
         delete_source=False,
+        mapping_pictures=False,
         use_multithreading=True,
         num_threads=None,
         save_mapping=True,
         save_preview=True,
         rows=4,
         cols=4,
-        preview_width=800
+        preview_width=1980
 ):
     """
     遍历目录并加密/解密文件，支持删除源文件、多线程、保存文件名映射。
@@ -28,6 +31,7 @@ def copy_with_fixed_random_suffix(
     :param dst_dir: 目标目录
     :param encrypt: True=加密，False=解密
     :param delete_source: 是否删除源文件
+    :param mapping_pictures: 是否只删除视频类大文件
     :param use_multithreading: 是否使用多线程
     :param num_threads: 线程数（None=使用默认线程池线程数）
     :param save_mapping: 是否在平行结构中保存映射（目录名+映射的log文件）
@@ -65,9 +69,20 @@ def copy_with_fixed_random_suffix(
             decrypt_file_with_name(src_file, os.path.dirname(dst_file), load_key())
 
         if save_mapping and map_dir:
-            log_path = os.path.join(map_dir, f"{orig_name}.log")
-            with open(log_path, "w", encoding="utf-8") as log_f:
-                log_f.write(enc_name)
+            # 如果 mapping_pictures 为真，则mapping图像源文件
+            if mapping_pictures:
+                if is_video_file(src_file):
+                    log_path = os.path.join(map_dir, f"{orig_name}.log")
+                    with open(log_path, "w", encoding="utf-8") as log_f:
+                        log_f.write(enc_name)
+                else:
+                    # 否则保存原始文件
+                    file_path = os.path.join(map_dir, orig_name)
+                    shutil.copyfile(src_file, file_path)
+            else:
+                log_path = os.path.join(map_dir, f"{orig_name}.log")
+                with open(log_path, "w", encoding="utf-8") as log_f:
+                    log_f.write(enc_name)
 
         if save_preview and encrypt and map_dir:
             generate_video_preview(src_file, os.path.join(map_dir, f"{orig_name}.png"), rows=rows, cols=cols, preview_width=preview_width)
@@ -149,7 +164,9 @@ if __name__ == "__main__":
     copy_with_fixed_random_suffix(
         source_directory,
         target_directory,
-        encrypt=True
+        encrypt=True,
+        delete_source=True,
+        mapping_pictures=True
     )
 
     # 设置源目录和目标目录
@@ -158,7 +175,8 @@ if __name__ == "__main__":
     copy_with_fixed_random_suffix(
         source_directory,
         target_directory,
-        encrypt=False
+        encrypt=False,
+        delete_source=True
     )
 
     print("处理完成!")
