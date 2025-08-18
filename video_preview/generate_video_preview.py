@@ -12,7 +12,7 @@ def is_video_file(file_path):
     return file_ext in video_extensions
 
 
-def generate_video_preview(video_path, output_path, rows=4, cols=4, preview_width=800):
+def generate_video_preview(video_path, output_path, rows=4, cols=4, preview_width=800, fit4169=True):
     """
     生成视频预览图网格
 
@@ -22,6 +22,7 @@ def generate_video_preview(video_path, output_path, rows=4, cols=4, preview_widt
         rows: 行数
         cols: 列数
         preview_width: 预览图宽度(高度按比例自动计算)
+        fit4169: 是否为横屏显示优化竖屏预览的排布
     """
     if not is_video_file(video_path):
         return
@@ -67,6 +68,10 @@ def generate_video_preview(video_path, output_path, rows=4, cols=4, preview_widt
     for frame in frames:
         resized = cv2.resize(frame, (thumb_width, thumb_height))
         resized_frames.append(resized)
+
+    if (cols == rows) and (thumb_width < thumb_height) and fit4169 and (cols%2==0):
+        cols = cols * 2
+        rows = rows // 2
 
     # 创建网格图像
     grid = np.zeros((thumb_height * rows, thumb_width * cols, 3), dtype=np.uint8)
