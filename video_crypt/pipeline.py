@@ -2,6 +2,8 @@ import os
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
+from video_preview.generate_video_preview import generate_video_preview
+
 from video_crypt.crypt import encrypt_folder_name, decrypt_folder_name, encrypt_file_with_name, decrypt_file_with_name
 from video_crypt.key_manager import load_key
 from video_crypt.utils import string_to_hash
@@ -12,9 +14,13 @@ def copy_with_fixed_random_suffix(
         dst_dir,
         encrypt=True,
         delete_source=False,
-        use_multithreading=False,
+        use_multithreading=True,
         num_threads=None,
-        save_mapping=True
+        save_mapping=True,
+        save_preview=True,
+        rows=4,
+        cols=4,
+        preview_width=800
 ):
     """
     遍历目录并加密/解密文件，支持删除源文件、多线程、保存文件名映射。
@@ -25,6 +31,10 @@ def copy_with_fixed_random_suffix(
     :param use_multithreading: 是否使用多线程
     :param num_threads: 线程数（None=使用默认线程池线程数）
     :param save_mapping: 是否在平行结构中保存映射（目录名+映射的log文件）
+    :param save_preview: 是否在平行结构中保存预览图
+    :param rows: 预览图行数
+    :param cols: 预览图列数
+    :param preview_width: 预览图的像素宽度，高度自动调整
     """
     dir_map = {}
     mapping_dir_map = {}
@@ -58,6 +68,9 @@ def copy_with_fixed_random_suffix(
             log_path = os.path.join(map_dir, f"{orig_name}.log")
             with open(log_path, "w", encoding="utf-8") as log_f:
                 log_f.write(enc_name)
+
+        if save_preview and encrypt and map_dir:
+            generate_video_preview(src_file, os.path.join(map_dir, f"{orig_name}.png"), rows=rows, cols=cols, preview_width=preview_width)
 
         if delete_source:
             try:
@@ -129,7 +142,6 @@ def copy_with_fixed_random_suffix(
                     pbar.update(1)
 
 
-
 if __name__ == "__main__":
     # 设置源目录和目标目录
     source_directory = '/some/path/2encrypt'
@@ -137,8 +149,7 @@ if __name__ == "__main__":
     copy_with_fixed_random_suffix(
         source_directory,
         target_directory,
-        encrypt=True,
-        use_multithreading=True
+        encrypt=True
     )
 
     # 设置源目录和目标目录
@@ -147,8 +158,7 @@ if __name__ == "__main__":
     copy_with_fixed_random_suffix(
         source_directory,
         target_directory,
-        encrypt=False,
-        use_multithreading=True
+        encrypt=False
     )
 
     print("处理完成!")

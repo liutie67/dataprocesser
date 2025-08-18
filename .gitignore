@@ -24,3 +24,5 @@ __pycache__
 local_launchpad.py
 /video_crypt/2decrypt
 /video_crypt/2encrypt
+/video_preview/2previewer
+/video_preview/previewed
