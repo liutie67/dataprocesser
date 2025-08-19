@@ -50,7 +50,8 @@ def copy_with_fixed_random_suffix(
         total_tasks = 0
         for root, dirs, files in os.walk(src_dir):
             # 关键修改：原地移除所有含@的目录，阻止os.walk进入这些目录
-            dirs[:] = [d for d in dirs if '@' not in d]
+            if not encrypt:
+                dirs[:] = [d for d in dirs if '@' not in d]
 
             # 统计当前目录的有效内容（已过滤掉@目录）
             valid_dirs = len(dirs)  # 因为dirs已经被过滤，直接取长度即可
@@ -95,7 +96,8 @@ def copy_with_fixed_random_suffix(
 
     with tqdm(total=total_tasks, desc="Processing", unit="item") as pbar:
         for root, dirs, files in os.walk(src_dir):
-            dirs[:] = [d for d in dirs if '@' not in d]
+            if not encrypt:
+                dirs[:] = [d for d in dirs if '@' not in d]
 
             # 处理目录
             if root == src_dir:
