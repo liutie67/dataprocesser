@@ -1,4 +1,5 @@
 import os
+import platform
 import subprocess
 
 import cv2
@@ -13,7 +14,11 @@ def canny_video(video_name, video_path='videos'):
     frame_height = int(cap.get(4))
     print('Processed video Resolution:', frame_width, 'x', frame_height)
     fps = cap.get(cv2.CAP_PROP_FPS)
-    video_name_out = os.path.join(video_path, 'processed', 'canny-' + video_name.split('.')[0] + '.mp4')
+    video_name_out = os.path.join('videos', 'processed', 'canny-' + video_name.split('.')[0] + '.mp4')
+    if os.path.exists(video_name_out):
+        cap.release()
+        print(f'{video_name_out} already exists !')
+        return video_name_out
     out_mp4 = cv2.VideoWriter(video_name_out, cv2.VideoWriter_fourcc(*"XVID"), fps, (frame_width, frame_height))
 
     # Read until video is completed
@@ -26,7 +31,8 @@ def canny_video(video_name, video_path='videos'):
             frame[70:160, 80:210] = 0
             frame[30:80, 1650:1870] = 0
             frame[700:1000, 1580:1870] = 0
-            frame = cv2.bitwise_not(frame)
+            if platform.system() == 'Linux':
+                frame = cv2.bitwise_not(frame)
             frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
             out_mp4.write(frame)
         # Break the loop
@@ -52,6 +58,8 @@ def convert_to_x264(input_from_canny_video):
     current_dir = os.path.dirname(os.path.realpath(__file__))
     input_video = os.path.join(current_dir, input_from_canny_video)
     output_video = input_video.split('.')[0] + '-x264.mp4'
+    if os.path.exists(output_video):
+        return output_video
     command = [
         'ffmpeg',
         '-y',  # 覆盖输出文件无需确认
@@ -79,6 +87,10 @@ def combine_video_audio(input_from_convert2x264, input_from_extract_audio, outpu
     audio_path = input_from_extract_audio
     current_dir = os.path.dirname(os.path.realpath(__file__))
     output_video = os.path.join(current_dir, output_path, input_from_extract_audio.split(os.sep)[-1].split('.')[0] + '-final.mp4')
+
+    if os.path.exists(output_video):
+        print(f'{output_video} already exists !')
+        return output_video
     cmd = [
         "ffmpeg",
         "-i", video_path,
@@ -95,3 +107,4 @@ def combine_video_audio(input_from_convert2x264, input_from_extract_audio, outpu
 
     subprocess.run(cmd, check=True)
     print('Finished.')
+    return None

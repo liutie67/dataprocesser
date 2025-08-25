@@ -2,10 +2,14 @@ import os
 import subprocess
 
 
-def extract_audio(video_name, video_path='videos'):
+def extract_audio(in_video_path, audio_save2_path='audios'):
     current_dir = os.path.dirname(os.path.realpath(__file__))
-    in_video_path = os.path.join(current_dir, video_path, video_name)
-    output_audio_path = os.path.join(current_dir, 'audios', video_name.split('.')[0] + '.aac')
+    video_name = os.path.split(in_video_path)[-1]
+    os.makedirs(os.path.join(current_dir, audio_save2_path), exist_ok=True)
+    output_audio_path = os.path.join(current_dir, audio_save2_path, video_name.split('.')[0] + '.aac')
+    if os.path.exists(output_audio_path):
+        print(output_audio_path, ' already exists !')
+        return output_audio_path
     command = [
         'ffmpeg',
         '-i', in_video_path,          # 输入视频文件
