@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 from duplicate_detection.hash import hash_file_complet, hash_file_fast
+from utiles import get_file_suffix_category
 
 
 def save_1file(file_info, conn):
@@ -22,9 +23,9 @@ def save_1file(file_info, conn):
     try:
         # 尝试插入主表
         cursor = conn.execute('''
-            INSERT INTO files (sha256, filename, filepath, filesize)
-            VALUES (?, ?, ?, ?)
-        ''', (sha256, file_info['filename'], file_info['filepath'], file_info['filesize']))
+            INSERT INTO files (sha256, filename, filepath, filesize, category, suffix)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (sha256, file_info['filename'], file_info['filepath'], file_info['filesize'], file_info['category'], file_info['suffix']))
 
         file_id = cursor.lastrowid
         conn.commit()
@@ -130,7 +131,7 @@ def add_files2database(
 
     def process_file(file_info):
         """处理单个文件并插入数据库，支持SHA256去重"""
-        root, filename = file_info
+        root, filename, suffix, category = file_info
         file_path = os.path.join(root, filename)
 
         try:
@@ -147,7 +148,9 @@ def add_files2database(
                 'sha256': sha256_hash,
                 'filename': filename,
                 'filepath': file_path,
-                'filesize': file_size
+                'filesize': file_size,
+                'suffix': suffix,
+                'category': category
             }
 
             # 获取线程专用的数据库连接并保存文件
@@ -174,17 +177,18 @@ def add_files2database(
             total_files += len([f for f in files if not f.startswith('.')])
         return total_files
 
-    def get_all_files_path(directory):
-        """获取所有文件路径"""
+    def get_all_files_infos(directory):
+        """获取所有文件路径等信息"""
         path_files = []
         for root, dirs, files in os.walk(directory):
             # 过滤掉包含@的目录和隐藏目录
             dirs[:] = [d for d in dirs if not d.startswith('.')]
             for file in files:
                 if not file.startswith('.'):
+                    suffix, category = get_file_suffix_category(file)
                     torecord = os.path.join(os.sep, root)
                     torecord = os.path.relpath(torecord, os.path.join(os.sep, pre_target_dir))
-                    path_files.append((torecord, file))
+                    path_files.append((torecord, file, suffix, category))
         return path_files
 
     # 主逻辑
@@ -198,7 +202,7 @@ def add_files2database(
         print(f"找到 {total_files} 个文件。")
 
         # 获取所有文件路径
-        path_all_files = get_all_files_path(os.path.join(pre_target_dir, target_dir))
+        path_all_files = get_all_files_infos(os.path.join(pre_target_dir, target_dir))
 
         # 统计结果
         stats = {
