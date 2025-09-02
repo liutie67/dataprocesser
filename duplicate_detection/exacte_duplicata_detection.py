@@ -154,39 +154,39 @@ def add_files2database(
                 pass
             return {'status': 'error', 'reason': str(e)}
 
-    def count_valid_videos(directory):
-        """统计有效的视频文件数量"""
+    def count_valid_files(directory):
+        """统计有效的文件数量"""
         total_files = 0
         for root, dirs, files in os.walk(directory):
-            # 过滤掉包含@的目录
-            dirs[:] = [d for d in dirs if '@' not in d and not d.startswith('.')]
-            # 统计视频文件
-            total_files += len([f for f in files if is_video_file(f) and not f.startswith('.')])
+            # 过滤掉隐藏的目录
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            # 统计文件
+            total_files += len([f for f in files if not f.startswith('.')])
         return total_files
 
-    def get_all_video_path(directory):
-        """获取所有视频文件路径"""
-        video_files = []
+    def get_all_files_path(directory):
+        """获取所有文件路径"""
+        path_files = []
         for root, dirs, files in os.walk(directory):
             # 过滤掉包含@的目录和隐藏目录
-            dirs[:] = [d for d in dirs if '@' not in d and not d.startswith('.')]
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
             for file in files:
-                if is_video_file(file) and not file.startswith('.'):
-                    video_files.append((root, file))
-        return video_files
+                if not file.startswith('.'):
+                    path_files.append((root, file))
+        return path_files
 
     # 主逻辑
     try:
         # 统计总文件数
-        total_files = count_valid_videos(target_dir)
+        total_files = count_valid_files(target_dir)
         if total_files == 0:
-            print("未找到视频文件")
+            print("未找到任何文件！")
             return
 
-        print(f"找到 {total_files} 个视频文件")
+        print(f"找到 {total_files} 个文件。")
 
-        # 获取所有视频文件
-        video_files = get_all_video_path(target_dir)
+        # 获取所有文件路径
+        path_all_files = get_all_files_path(target_dir)
 
         # 统计结果
         stats = {
@@ -203,7 +203,7 @@ def add_files2database(
                 with ThreadPoolExecutor(max_workers=num_threads) as executor:
                     # 提交所有任务
                     futures = []
-                    for file_info in video_files:
+                    for file_info in path_all_files:
                         future = executor.submit(process_file, file_info)
                         future.add_done_callback(lambda x: pbar.update(1))
                         futures.append(future)
@@ -220,7 +220,7 @@ def add_files2database(
 
             else:
                 # 单线程处理
-                for file_info in video_files:
+                for file_info in path_all_files:
                     result = process_file(file_info)
                     if result['status'] in stats:
                         stats[result['status']] += 1
