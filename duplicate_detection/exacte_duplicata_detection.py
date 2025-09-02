@@ -77,6 +77,7 @@ def save_1file(file_info, conn):
 def add_files2database(
         db_path,
         target_dir,
+        pre_target_dir='',
         num_threads=None,
         use_multithreading=False
 ):
@@ -84,10 +85,13 @@ def add_files2database(
     多线程将目标文件夹中的文件信息加入数据库，支持SHA256去重
 
     :param db_path: 数据库路径
-    :param target_dir: 目标文件夹路径
+    :param target_dir: 入库的文件夹路径
+    :param pre_target_dir: 针对每个系统而不同的路径
     :param num_threads: 线程数（None=使用默认线程池线程数）
     :param use_multithreading: 是否使用多线程
     """
+    target_dir = os.path.normpath(target_dir)
+    pre_target_dir = os.path.normpath(pre_target_dir)
     # 线程本地存储，每个线程有自己的数据库连接
     thread_local = threading.local()
 
@@ -125,10 +129,10 @@ def add_files2database(
 
         try:
             # 获取文件大小
-            file_size = os.path.getsize(file_path)
+            file_size = os.path.getsize(os.path.join(pre_target_dir, file_path))
 
             # 计算SHA256哈希
-            sha256_hash = calculate_sha256(file_path)
+            sha256_hash = calculate_sha256(os.path.join(pre_target_dir, file_path))
             if sha256_hash is None:
                 return {'status': 'error', 'reason': 'hash_failed'}
 
@@ -172,13 +176,15 @@ def add_files2database(
             dirs[:] = [d for d in dirs if not d.startswith('.')]
             for file in files:
                 if not file.startswith('.'):
-                    path_files.append((root, file))
+                    torecord = os.path.join(os.sep, root)
+                    torecord = os.path.relpath(torecord, os.path.join(os.sep, pre_target_dir))
+                    path_files.append((torecord, file))
         return path_files
 
     # 主逻辑
     try:
         # 统计总文件数
-        total_files = count_valid_files(target_dir)
+        total_files = count_valid_files(os.path.join(pre_target_dir, target_dir))
         if total_files == 0:
             print("未找到任何文件！")
             return
@@ -186,7 +192,7 @@ def add_files2database(
         print(f"找到 {total_files} 个文件。")
 
         # 获取所有文件路径
-        path_all_files = get_all_files_path(target_dir)
+        path_all_files = get_all_files_path(os.path.join(pre_target_dir, target_dir))
 
         # 统计结果
         stats = {
