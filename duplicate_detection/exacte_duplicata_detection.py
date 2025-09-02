@@ -77,7 +77,7 @@ def save_1file(file_info, conn):
 def add_files2database(
         db_path,
         target_dir,
-        pre_target_dir='',
+        pre_target_dir,
         num_threads=None,
         use_multithreading=False
 ):
@@ -252,9 +252,10 @@ def add_files2database(
 if __name__ == "__main__":
     DATABASE_PATH = 'path/to/database'
     toadddir = 'path/to/directory'
+    predir = 'path/to/pre/target/dir'
 
     add_files2database(
         db_path=DATABASE_PATH,
-        target_dir=toadddir,
-        num_threads=4
+        pre_target_dir=toadddir,
+        target_dir=predir
     )
