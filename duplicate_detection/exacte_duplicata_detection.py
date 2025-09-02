@@ -78,7 +78,7 @@ def add_files2database(
         db_path,
         target_dir,
         num_threads=None,
-        use_multithreading=True
+        use_multithreading=False
 ):
     """
     多线程将目标文件夹中的文件信息加入数据库，支持SHA256去重
