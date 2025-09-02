@@ -4,7 +4,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
-from duplicate_detection.hash import hash_file_complet
+from duplicate_detection.hash import hash_file_complet, hash_file_fast
 
 
 def save_1file(file_info, conn):
@@ -79,7 +79,8 @@ def add_files2database(
         target_dir,
         pre_target_dir,
         num_threads=None,
-        use_multithreading=False
+        use_multithreading=False,
+        hash_type='fast'
 ):
     """
     多线程将目标文件夹中的文件信息加入数据库，支持SHA256去重
@@ -89,6 +90,7 @@ def add_files2database(
     :param pre_target_dir: 针对每个系统而不同的路径
     :param num_threads: 线程数（None=使用默认线程池线程数）
     :param use_multithreading: 是否使用多线程
+    :param hash_type: 计算的hash类型
     """
     target_dir = os.path.normpath(target_dir)
     pre_target_dir = os.path.normpath(pre_target_dir)
@@ -116,7 +118,11 @@ def add_files2database(
     def calculate_sha256(file_path):
         """计算文件的SHA256哈希值"""
         try:
-            sha256 = hash_file_complet(file_path)
+            sha256 = 'hash_x'
+            if hash_type == 'complet':
+                sha256 = hash_file_complet(file_path)
+            elif hash_type == 'fast':
+                sha256 = hash_file_fast(file_path)
             return sha256
         except Exception as e:
             print(f"计算哈希值时出错 {file_path}: {e}")
