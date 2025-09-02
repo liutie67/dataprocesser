@@ -4,6 +4,7 @@ import sqlite3
 from tqdm import tqdm
 
 from duplicate_detection.hash import hash_file_complet
+from utiles import get_human_readable_size
 
 
 def initialize_db():
@@ -198,6 +199,49 @@ def cleanup_deleted_files(db_path):
 
     except Exception as e:
         print(f"清理记录时出错: {e}")
+
+
+
+def get_total_duplicates_size(db_path):
+    """
+    计算duplicates表中所有deleted标记为0的文件大小总和
+
+    :param db_path: 数据库路径
+    :return: 文件大小总和，如果出错返回None
+    """
+    try:
+        with sqlite3.connect(db_path) as conn:
+            # 检查表是否存在deleted字段
+            cursor = conn.execute("PRAGMA table_info(duplicates)")
+            columns = [column[1] for column in cursor.fetchall()]
+
+            if 'deleted' not in columns:
+                print("警告: duplicates表没有deleted字段，将计算所有记录！")
+                # 如果没有deleted字段，计算所有记录的大小
+                cursor = conn.execute('''
+                    SELECT SUM(filesize) 
+                    FROM duplicates
+                ''')
+            else:
+                # 计算deleted=0的记录大小总和
+                cursor = conn.execute('''
+                    SELECT SUM(filesize) 
+                    FROM duplicates
+                    WHERE deleted = 0
+                ''')
+
+            total_size = cursor.fetchone()[0]
+
+            print(f"重复文件总大小 = {get_human_readable_size(total_size)}")
+
+            return total_size if total_size is not None else 0
+
+    except sqlite3.Error as e:
+        print(f"数据库错误: {e}")
+        return None
+    except Exception as e:
+        print(f" unexpected error: {e}")
+        return None
 
 
 if __name__ == '__main__':
