@@ -23,9 +23,9 @@ def save_1file(file_info, conn):
     try:
         # 尝试插入主表
         cursor = conn.execute('''
-            INSERT INTO files (sha256, filename, filepath, filesize, category, suffix)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (sha256, file_info['filename'], file_info['filepath'], file_info['filesize'], file_info['category'], file_info['suffix']))
+            INSERT INTO files (sha256, filename, filepath, filesize, category, suffix, location_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (sha256, file_info['filename'], file_info['filepath'], file_info['filesize'], file_info['category'], file_info['suffix'], file_info['location']))
 
         file_id = cursor.lastrowid
         conn.commit()
@@ -64,9 +64,9 @@ def save_1file(file_info, conn):
                         # 插入副表（不同路径的相同内容文件）
                         conn.execute('''
                             INSERT INTO duplicates 
-                            (original_id, sha256, filename, filepath, filesize)
-                            VALUES (?, ?, ?, ?, ?)
-                        ''', (original_details[0], sha256, file_info['filename'], file_info['filepath'], file_info['filesize']))
+                            (original_id, sha256, filename, filepath, filesize, location_id)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        ''', (original_details[0], sha256, file_info['filename'], file_info['filepath'], file_info['filesize'], file_info['location']))
 
                         conn.commit()
                         return {'status': 'duplicate', 'original_file_id': original_details[0]}
@@ -81,7 +81,8 @@ def add_files2database(
         pre_target_dir,
         num_threads=None,
         use_multithreading=False,
-        hash_type='fast'
+        hash_type='fast',
+        location=None
 ):
     """
     多线程将目标文件夹中的文件信息加入数据库，支持SHA256去重
@@ -92,6 +93,7 @@ def add_files2database(
     :param num_threads: 线程数（None=使用默认线程池线程数）
     :param use_multithreading: 是否使用多线程
     :param hash_type: 计算的hash类型
+    :param location: 文件的位置标注
     """
     target_dir = os.path.normpath(target_dir)
     pre_target_dir = os.path.normpath(pre_target_dir)
@@ -150,7 +152,8 @@ def add_files2database(
                 'filepath': file_path,
                 'filesize': file_size,
                 'suffix': suffix,
-                'category': category
+                'category': category,
+                'location': location
             }
 
             # 获取线程专用的数据库连接并保存文件
@@ -266,6 +269,6 @@ if __name__ == "__main__":
 
     add_files2database(
         db_path=DATABASE_PATH,
-        pre_target_dir=toadddir,
-        target_dir=predir
+        pre_target_dir=predir,
+        target_dir=toadddir
     )
