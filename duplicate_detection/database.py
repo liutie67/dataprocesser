@@ -91,11 +91,12 @@ def delete_duplicate_files(db_path, pre_target_dir, dry_run=True):
                 print("没有找到需要删除的重复文件！")
                 return
 
-            confirm = input(f"找到 {len(duplicates)} 个待删除的重复文件，是否要永久移除这些文件？(y/N): ")
+            if not dry_run:
+                confirm = input(f"找到 {len(duplicates)} 个待删除的重复文件，是否要永久移除这些文件？(y/N): ")
 
-            if not (confirm.lower() == 'y' or confirm.lower() == 'yes'):
-                print("<删除操作>取消！")
-                return
+                if not (confirm.lower() == 'y' or confirm.lower() == 'yes'):
+                    print("<删除操作>取消！")
+                    return
 
             deleted_count = 0
             error_count = 0
