@@ -1,5 +1,6 @@
 import os.path
 import sqlite3
+from pathlib import Path
 
 from tqdm import tqdm
 
@@ -201,7 +202,6 @@ def cleanup_deleted_files(db_path):
         print(f"清理记录时出错: {e}")
 
 
-
 def get_total_duplicates_size(db_path):
     """
     计算duplicates表中所有deleted标记为0的文件大小总和
@@ -242,6 +242,96 @@ def get_total_duplicates_size(db_path):
     except Exception as e:
         print(f" unexpected error: {e}")
         return None
+
+
+def record_folders2database(db_path, pre_target_dir, target_dir, location):
+    """
+    检测指定路径的第一层文件夹，并将文件夹名写入SQLite数据库，同时重命名原文件夹
+
+    Args:
+        db_path (str): SQLite数据库文件路径
+        pre_target_dir: 针对每个系统而不同的路径
+        target_dir (str): 要扫描的目录路径(数据库记录的起始路径)
+        location (int): 文件夹数据库位置标签🏷️
+    """
+    # 询问用户确认
+    confirm = input(f"record_folders2database: 每个 location id: {str(location)} 的 '{target_dir}' 只执行一次！(y/N): ").strip().lower()
+
+    if confirm == 'y' or confirm == 'yes':
+        print('record_folders2database: 开始记录📝: ')
+    else:
+        print('record_folders2database: 操作取消！')
+        return
+
+    table_name = target_dir.replace(os.sep, '').replace('.', '')
+    target_dir = os.path.normpath(target_dir)
+    pre_target_dir = os.path.normpath(pre_target_dir)
+    target_dir = os.path.join(pre_target_dir, target_dir)
+
+    # 确保目录存在
+    if not os.path.exists(target_dir):
+        print(f"record_folders2database: 错误：目录 '{target_dir}' 不存在！")
+        return
+
+    # 连接到SQLite数据库
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # 获取目录中的第一层文件夹
+    folders = [f for f in Path(target_dir).iterdir() if f.is_dir()]
+
+    for folder_path in folders:
+        original_name = folder_path.name
+        original_full_path = str(folder_path)
+        proposed_name = original_name
+        attempt = 1
+
+        while True:
+            try:
+                # 如果名称有变化，需要重命名文件夹
+                if proposed_name != original_name:
+                    new_path = os.path.join(target_dir, proposed_name)
+
+                    # 检查新路径是否已存在（避免覆盖）
+                    if os.path.exists(new_path):
+                        print(f"record_folders2database： 警告：路径 '{new_path}' 已存在，无法重命名！")
+                    else:
+                        # 重命名文件夹
+                        try:
+                            os.rename(original_full_path, new_path)
+                            print(f"record_folders2database: 已重命名文件夹: '{original_name}' -> '{proposed_name}'")
+                        except OSError as e:
+                            print(f"record_folders2database: 重命名失败: {e}")
+
+                # 插入数据库记录
+                cursor.execute(
+                    f"INSERT INTO {table_name} (folder, location_id) VALUES (?, ?)",
+                    (proposed_name, location)
+                )
+                conn.commit()
+                print(f"record_folders2database: 成功插入: {proposed_name}")
+                break
+
+            except sqlite3.IntegrityError:
+                # 名称重复，询问用户是否要添加后缀
+                print(f"record_folders2database: 文件夹名 '{proposed_name}' 已存在。")
+
+                # 询问用户确认
+                confirm = input(f"record_folders2database: 为 '{original_name}' 添加后缀重试(y/N): ").strip().lower()
+
+                if confirm == 'y' or confirm == 'yes':
+                    # 生成新名称
+                    proposed_name = f"{original_name}(重{attempt})"
+                    attempt += 1
+                    print(f"record_folders2database: 尝试新名称: {proposed_name}")
+                    
+            except Exception as e:
+                print(f"record_folders2database: 处理文件夹 '{original_name}' 时发生错误: {e}")
+                break
+
+    # 关闭数据库连接
+    conn.close()
+    print(f"record_folders2database: '{target_dir.replace(os.sep, '').replace('.', '')}' 处理完成。")
 
 
 if __name__ == '__main__':
