@@ -79,10 +79,10 @@ def add_files2database(
         db_path,
         target_dir,
         pre_target_dir,
+        location,
         num_threads=None,
         use_multithreading=False,
-        hash_type='fast',
-        location=None
+        hash_type='fast'
 ):
     """
     多线程将目标文件夹中的文件信息加入数据库，支持SHA256去重
@@ -266,9 +266,11 @@ if __name__ == "__main__":
     DATABASE_PATH = 'path/to/database'
     toadddir = 'path/to/directory'
     predir = 'path/to/pre/target/dir'
+    location = 0
 
     add_files2database(
         db_path=DATABASE_PATH,
         pre_target_dir=predir,
-        target_dir=toadddir
+        target_dir=toadddir,
+        location=location
     )
