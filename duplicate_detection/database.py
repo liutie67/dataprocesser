@@ -319,7 +319,7 @@ def record_folders2database(db_path, pre_target_dir, target_dir, location):
                     (proposed_name, location)
                 )
                 conn.commit()
-                print(f"record_folders2database: 成功插入: {proposed_name}")
+                print(f"record_folders2database: ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ add : {proposed_name}")
                 break
 
             except sqlite3.IntegrityError:
@@ -344,7 +344,7 @@ def record_folders2database(db_path, pre_target_dir, target_dir, location):
                     attempt += 1
                     print(f"record_folders2database: rename: 尝试新名称: '{proposed_name}'")
                 elif action == 's' or action == 'skip':
-                    print(f"record_folders2database: skip: 跳过文件夹: '{original_name}'")
+                    print(f"record_folders2database: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ skip : 跳过文件夹: '{original_name}'")
                     break  # 跳出while循环，继续处理下一个文件夹
                     
             except Exception as e:
