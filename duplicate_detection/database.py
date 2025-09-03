@@ -69,23 +69,24 @@ def legacy_insert_file_data(db_path, file_path, mark=None):
             conn.close()
 
 
-def delete_duplicate_files(db_path, pre_target_dir, dry_run=True):
+def delete_duplicate_files(db_path, pre_target_dir, location, dry_run=True):
     """
     删除重复文件并将删除状态更新到数据库
     :param db_path: 数据库路径
     :param pre_target_dir: 针对每个系统而不同的路径
+    :param location: 储存的位置 (作为筛选)
     :param dry_run: 是否为干运行（只显示不实际删除）
     """
     pre_target_dir = os.path.normpath(pre_target_dir)
     try:
         with sqlite3.connect(db_path) as conn:
             # 获取所有需要删除的重复文件
-            cursor = conn.execute('''
+            cursor = conn.execute(f'''
                 SELECT df.id, df.filepath, uf.filepath as original_path, df.sha256
                 FROM duplicates df
                 JOIN files uf ON df.original_id = uf.id
-                WHERE df.deleted = 0
-            ''')
+                WHERE df.deleted = 0 AND df.location_id = ?
+            ''', (location,))
 
             duplicates = cursor.fetchall()
 
@@ -202,11 +203,13 @@ def cleanup_deleted_files(db_path):
         print(f"清理记录时出错: {e}")
 
 
-def get_total_duplicates_size(db_path):
+def get_total_duplicates_size(db_path, deleted=0, location=None):
     """
     计算duplicates表中所有deleted标记为0的文件大小总和
 
     :param db_path: 数据库路径
+    :param deleted: 是否已删除文件
+    :param location: 储存的位置 (作为筛选)
     :return: 文件大小总和，如果出错返回None
     """
     try:
@@ -216,7 +219,7 @@ def get_total_duplicates_size(db_path):
             columns = [column[1] for column in cursor.fetchall()]
 
             if 'deleted' not in columns:
-                print("警告: duplicates表没有deleted字段，将计算所有记录！")
+                print("get_total_duplicates_size: 警告: duplicates表没有deleted字段，将计算所有记录！")
                 # 如果没有deleted字段，计算所有记录的大小
                 cursor = conn.execute('''
                     SELECT SUM(filesize) 
@@ -224,23 +227,30 @@ def get_total_duplicates_size(db_path):
                 ''')
             else:
                 # 计算deleted=0的记录大小总和
-                cursor = conn.execute('''
-                    SELECT SUM(filesize) 
-                    FROM duplicates
-                    WHERE deleted = 0
-                ''')
+                if location is None:
+                    cursor = conn.execute('''
+                                            SELECT SUM(filesize) 
+                                            FROM duplicates
+                                            WHERE deleted = ?
+                                        ''', (deleted,))
+                else:
+                    cursor = conn.execute('''
+                                            SELECT SUM(filesize) 
+                                            FROM duplicates
+                                            WHERE deleted = ? AND location_id = ?
+                                        ''', (deleted, location,))
 
             total_size = cursor.fetchone()[0]
 
-            print(f"重复文件总大小 = {get_human_readable_size(total_size)}")
+            print(f"get_total_duplicates_size: location id: {location} 重复文件总大小 = {get_human_readable_size(total_size)}")
 
             return total_size if total_size is not None else 0
 
     except sqlite3.Error as e:
-        print(f"数据库错误: {e}")
+        print(f"get_total_duplicates_size: 数据库错误: {e}")
         return None
     except Exception as e:
-        print(f" unexpected error: {e}")
+        print(f"get_total_duplicates_size: unexpected error: {e}")
         return None
 
 
