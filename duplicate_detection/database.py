@@ -265,9 +265,9 @@ def record_folders2database(db_path, pre_target_dir, target_dir, location):
         location (int): 文件夹数据库位置标签🏷️
     """
     # 询问用户确认
-    confirm = input(f"record_folders2database: 每个 location id: {str(location)} 的 '{target_dir}' 只执行一次！(y/N): ").strip().lower()
+    confirm = input(f"record_folders2database: 相同 location id 重复执行只添加新增的文件夹(y确认/N取消): ").strip().lower()
 
-    if confirm == 'y' or confirm == 'yes':
+    if confirm == 'y' or confirm == 'yes' or confirm == 'y确认' or confirm == '确认':
         print('record_folders2database: 开始记录📝: ')
     else:
         print('record_folders2database: 操作取消！')
@@ -326,14 +326,26 @@ def record_folders2database(db_path, pre_target_dir, target_dir, location):
                 # 名称重复，询问用户是否要添加后缀
                 print(f"record_folders2database: 文件夹名 '{proposed_name}' 已存在。")
 
-                # 询问用户确认
-                confirm = input(f"record_folders2database: 为 '{original_name}' 添加后缀重试(y/N): ").strip().lower()
+                # 检查是否是同一个location
+                cursor = conn.execute('''
+                                SELECT location_id FROM aenfer WHERE folder = ?
+                            ''', (proposed_name,))
+                loca = cursor.fetchone()[0]
 
-                if confirm == 'y' or confirm == 'yes':
+                if location != loca:
+                    # 询问用户确认
+                    action = input(f"record_folders2database: 为 '{original_name}' 添加后缀重试(y/yes), 跳过当前文件夹(s/skip), 或取消其他操作(N): ").strip().lower()
+                else:
+                    action = 'skip'
+
+                if action == 'y' or action == 'yes':
                     # 生成新名称
                     proposed_name = f"{original_name}(重{attempt})"
                     attempt += 1
-                    print(f"record_folders2database: 尝试新名称: {proposed_name}")
+                    print(f"record_folders2database: rename: 尝试新名称: '{proposed_name}'")
+                elif action == 's' or action == 'skip':
+                    print(f"record_folders2database: skip: 跳过文件夹: '{original_name}'")
+                    break  # 跳出while循环，继续处理下一个文件夹
                     
             except Exception as e:
                 print(f"record_folders2database: 处理文件夹 '{original_name}' 时发生错误: {e}")
