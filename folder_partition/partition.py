@@ -116,7 +116,7 @@ def _process_current_folder(folder: Path, threshold: int, is_root: bool = False)
             # 只有一个部分，不需要分割
             continue
 
-        part_name = f"{base_name}(part_{i})"
+        part_name = f"{base_name}(part{i})"
         part_folder = folder.parent / part_name
         part_folder.mkdir(exist_ok=True)
         created_folders.append(part_folder)
@@ -264,7 +264,7 @@ def _get_folder_size(folder: Path) -> int:
 
 def _is_split_folder(item: Path) -> bool:
     """检查是否为分割文件夹"""
-    return item.is_dir() and ('(part_' in item.name or item.name.startswith('split_part_'))
+    return item.is_dir() and ('(part' in item.name or item.name.startswith('split_part_'))
 
 
 def _is_temp_folder(item: Path) -> bool:
