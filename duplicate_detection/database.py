@@ -4,8 +4,8 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from duplicate_detection.hash import hash_file_complet
-from utiles import get_human_readable_size
+from duplicate_detection.hash import hash_file_complet, hash_file_fast
+from duplicate_detection.utiles import get_human_readable_size
 
 
 def initialize_db():
@@ -354,6 +354,114 @@ def record_folders2database(db_path, pre_target_dir, target_dir, location):
     # 关闭数据库连接
     conn.close()
     print(f"record_folders2database: '{target_dir.replace(os.sep, '').replace('.', '')}' 处理完成。")
+
+
+def existed_files_in_database(folder_path, db_file, delete_existed=False):
+    """
+    检查文件夹中所有文件的哈希值是否存在于数据库中
+
+    Args:
+        folder_path: 目标文件夹路径
+        db_file: SQLite数据库文件路径
+        delete_existed: 是否删除已存在于数据库的文件
+    """
+    folder_path = Path(folder_path)
+    db_file = Path(db_file)
+
+    if not folder_path.exists() or not folder_path.is_dir():
+        print(f"错误: 文件夹路径 '{folder_path}' 不存在或不是目录")
+        return
+
+    if not db_file.exists():
+        print(f"错误: 数据库文件 '{db_file}' 不存在")
+        return
+
+    # 连接到数据库
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
+
+    # 确保files表和sha256字段存在
+    try:
+        cursor.execute("SELECT sha256 FROM files LIMIT 1")
+    except sqlite3.OperationalError:
+        print("错误: 数据库中不存在files表或sha256字段")
+        conn.close()
+        return
+
+    # 为sha256字段创建索引（如果不存在的话）以提高查询性能
+    try:
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_sha256 ON files (sha256)")
+        conn.commit()
+    except Exception as e:
+        print(f"警告: 创建索引失败: {e}")
+
+    # 遍历文件夹中的文件
+    existing_count = 0
+    missing_count = 0
+    existing_size = 0
+    missing_size = 0
+    total_files = 0
+    deleted_count = 0
+    deleted_size = 0
+
+    print("开始检查文件...")
+
+    for file_path in folder_path.rglob('*'):
+        if file_path.name.startswith('.'):
+            continue
+        if file_path.is_file():
+            total_files += 1
+            try:
+                file_hash = hash_file_fast(file_path)
+                file_size = file_path.stat().st_size
+
+                # 逐个查询数据库
+                cursor.execute("SELECT COUNT(*) FROM files WHERE sha256 = ?", (file_hash,))
+                exists = cursor.fetchone()[0] > 0
+
+                if exists:
+                    existing_count += 1
+                    existing_size += file_size
+                    print(f"✓ 已存在: {file_path.name}")
+
+                    # 如果设置了删除选项，删除已存在的文件
+                    if delete_existed:
+                        try:
+                            file_path.unlink()  # 删除文件
+                            deleted_count += 1
+                            deleted_size += file_size
+                            print(f"  已删除: {file_path.name}")
+                        except Exception as e:
+                            print(f"  删除失败: {file_path.name} - {e}")
+                else:
+                    missing_count += 1
+                    missing_size += file_size
+                    print(f"✗ 不存在: {file_path.name}")
+
+            except Exception as e:
+                print(f"错误处理文件 {file_path}: {e}")
+                continue
+
+    # 关闭数据库连接
+    conn.close()
+
+    # 打印结果
+    print("\n" + "=" * 50)
+    print("检查结果:")
+    print(f"总文件数: {total_files}")
+    print(f"已存在于数据库的文件数: {existing_count}")
+    print(f"不存在于数据库的文件数: {missing_count}")
+    print(f"已存在文件总大小: {existing_size} 字节 ({existing_size / 1024 / 1024:.2f} MB)")
+    print(f"不存在文件总大小: {missing_size} 字节 ({missing_size / 1024 / 1024:.2f} MB)")
+    print(
+        f"所有文件总大小: {existing_size + missing_size} 字节 ({(existing_size + missing_size) / 1024 / 1024:.2f} MB)")
+
+    if delete_existed:
+        print(f"\n删除统计:")
+        print(f"已删除文件数: {deleted_count}")
+        print(f"已删除文件总大小: {deleted_size} 字节 ({deleted_size / 1024 / 1024:.2f} MB)")
+
+    print("=" * 50)
 
 
 if __name__ == '__main__':
