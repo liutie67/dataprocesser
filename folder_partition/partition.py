@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import List, Tuple
 import time
 
+from folder_partition.utiles import remove_empty_folders
+
 
 def split_folder_by_size(folderpath: str, threshsize: float=20, use_decimal=True) -> List[Path]:
     """
@@ -27,6 +29,8 @@ def split_folder_by_size(folderpath: str, threshsize: float=20, use_decimal=True
     if not folderpath.exists() or not folderpath.is_dir():
         raise ValueError(f"目标文件夹不存在或不是文件夹: {folderpath}")
 
+    remove_empty_folders(folderpath)
+
     print(f"开始处理文件夹: {folderpath}")
     print(f"阈值: {threshsize}GB ({threshold / 1024 / 1024 / 1024:.2f}GB)")
 
@@ -36,6 +40,8 @@ def split_folder_by_size(folderpath: str, threshsize: float=20, use_decimal=True
         if item.is_dir() and not item.name.startswith('.') and not _is_temp_folder(item):
             created_folders.extend(_process_folder_recursive(item, int(threshold), is_root=True))
     print(f"\n处理完成！共创建了 {len(created_folders)} 个分割文件夹")
+
+    remove_empty_folders(folderpath)
 
     return created_folders
 
