@@ -59,5 +59,5 @@ if __name__ == "__main__":
     ]
 
     for file in test_files:
-        suffix, file_type = get_file_info(file)
+        suffix, file_type = get_file_suffix_category(file)
         print(f"文件名: {file:15} 后缀: {suffix:6} 类型: {file_type}")

@@ -39,6 +39,39 @@ def remove_empty_folders(target_dir):
     print(f"清理完成，共删除了 {deleted_count} 个空文件夹")
 
 
+def get_dir_size(folder) -> int:
+    """
+    获取文件夹的总大小
+    Args:
+        folder: 可以是字符串路径或Path对象
+    Returns:
+        int: 文件夹的总大小（字节）
+    """
+    folder = Path(folder)
+    total_size = 0
+
+    if not folder.exists():
+        print(f"路径不存在: {folder}")
+        return 0
+
+    if not folder.is_dir():
+        print(f"路径不是文件夹: {folder}")
+        return 0
+
+    try:
+        for item in folder.rglob('*'):
+            if item.is_file():
+                try:
+                    total_size += item.stat().st_size
+                except (OSError, PermissionError) as e:
+                    print(f"无法访问文件 {item}: {e}")
+                    continue
+    except (OSError, PermissionError) as e:
+        print(f"无法遍历文件夹 {folder}: {e}")
+
+    return total_size
+
+
 # 使用示例
 if __name__ == "__main__":
     target_directory = "apartition"  # 替换为你的目标目录

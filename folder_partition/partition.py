@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Tuple
 import time
 
-from folder_partition.utiles import remove_empty_folders
+from folder_partition.utiles import remove_empty_folders, get_dir_size
 
 
 def split_folder_by_size(folderpath: str, threshsize: float=20, use_decimal=True) -> List[Path]:
@@ -86,7 +86,7 @@ def _process_current_folder(folder: Path, threshold: int, is_root: bool = False)
         return created_folders
 
     # 计算当前文件夹总大小
-    folder_size = _get_folder_size(folder)
+    folder_size = get_dir_size(folder)
 
     if folder_size <= threshold:
         # 当前文件夹不需要分割
@@ -245,27 +245,10 @@ def _get_item_size(item: Path) -> int:
         if item.is_file():
             return item.stat().st_size
         elif item.is_dir():
-            return _get_folder_size(item)
+            return get_dir_size(item)
     except Exception as e:
         print(f"无法获取大小 {item}: {e}")
     return 0
-
-
-def _get_folder_size(folder: Path) -> int:
-    """
-    获取文件夹的总大小
-    """
-    total_size = 0
-    try:
-        for item in folder.rglob('*'):
-            if item.is_file():
-                try:
-                    total_size += item.stat().st_size
-                except:
-                    continue
-    except Exception as e:
-        print(f"无法计算文件夹大小 {folder}: {e}")
-    return total_size
 
 
 def _is_split_folder(item: Path) -> bool:
@@ -299,7 +282,7 @@ def verify_folder_sizes(folderpath: str, threshsize: float = 20) -> bool:
     all_valid = True
     for item in folderpath.rglob('*'):
         if item.is_dir() and not _is_temp_folder(item):
-            size = _get_folder_size(item)
+            size = get_dir_size(item)
             if size > threshold:
                 print(f"错误: {item} 大小 {_display_size(size)} 超过阈值")
                 all_valid = False
