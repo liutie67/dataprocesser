@@ -1,3 +1,6 @@
+import shutil
+
+
 def get_human_readable_size(size_bytes):
     """将字节大小转换为更易读的格式"""
     if size_bytes is None:
@@ -44,6 +47,21 @@ def get_file_suffix_category(filename):
             break
 
     return suffix, file_type
+
+
+def get_disk_usage(target_dir):
+    # 获取目录所在分区的磁盘使用情况
+    total, used, free = shutil.disk_usage(target_dir)
+    return {
+        'total': total,      # 总容量（字节）
+        'used': used,        # 已使用空间（字节）
+        'free': free,        # 可用空间（字节）
+        'readable' : {
+            'total': get_human_readable_size(total),
+            'used': get_human_readable_size(used),
+            'free': get_human_readable_size(free),
+        }
+    }
 
 
 # 测试示例
