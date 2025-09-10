@@ -23,7 +23,8 @@ def copy_with_fixed_random_suffix(
         save_preview=True,
         rows=4,
         cols=4,
-        preview_width=1980
+        preview_width=1980,
+        previewOnly=False
 ):
     """
     遍历目录并加密/解密文件，支持删除源文件、多线程、保存文件名映射。
@@ -39,6 +40,7 @@ def copy_with_fixed_random_suffix(
     :param rows: 预览图行数
     :param cols: 预览图列数
     :param preview_width: 预览图的像素宽度，高度自动调整
+    :param previewOnly: 只输出preview@文件夹,不输出加密文件
     """
     dir_map = {}
     mapping_dir_map = {}
@@ -65,7 +67,8 @@ def copy_with_fixed_random_suffix(
     def process_file(src_file, dst_file, encrypt, delete_source, map_dir, orig_name, enc_name):
         """单个文件处理函数"""
         if encrypt:
-            encrypt_file_with_name(src_file, dst_file, load_key())
+            if not previewOnly:
+                encrypt_file_with_name(src_file, dst_file, load_key())
         else:
             decrypt_file_with_name(src_file, os.path.dirname(dst_file), load_key())
 
