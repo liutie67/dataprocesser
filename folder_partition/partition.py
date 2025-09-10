@@ -272,11 +272,11 @@ def _display_size(size_bytes: int) -> str:
     return f"{size_bytes:.2f} PB"
 
 
-def verify_folder_sizes(folderpath: str, threshsize: float = 20) -> bool:
+def verify_folder_sizes(folderpath: str, threshsize: float = 20, scale: int = 1000) -> bool:
     """
     验证文件夹中的所有项目都不超过阈值
     """
-    threshold = threshsize * 1024 * 1024 * 1024
+    threshold = threshsize * scale * scale * scale
     folderpath = Path(folderpath)
 
     all_valid = True
