@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
 from duplicate_detection.hash import hash_file_complet, hash_file_fast
-from utiles import get_file_suffix_category
+from duplicate_detection.utiles import get_file_suffix_category
 
 
 def save_1file(file_info, conn):

@@ -465,7 +465,7 @@ def existed_files_in_database(folder_path, db_file, delete_existed=False):
 
 
 from typing import List, Tuple, Dict, Any
-def check_matches_database_disk(database_path, location: int, folder_path, verbose: bool=True) -> Dict[str, List[Tuple[int, str]]]:
+def check_matches_database_disk(database_path, location: int, folder_path, verbose: bool=True, assaini_by_filename=False) -> Dict[str, List[Tuple[int, str]]]:
     """
     检查数据库中的文件路径是否与实际文件夹中的文件匹配
 
@@ -474,6 +474,7 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
         location: 要检查的location_id值
         folder_path: 目标文件夹路径
         verbose: 是否print打印检测信息
+        assaini_by_filename: 是否根据文件名称标记 assaini 字段
 
     Returns:
         包含两个列表的字典：
@@ -546,28 +547,29 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
                 print(f"  路径: {filepath}")
 
         # 新增功能：如果db_not_in_folder不为空且folder_not_in_db为空，询问用户是否更新assaini字段
-        if db_not_in_folder and not folder_not_in_db:
-            print("\n" + "-" * 100)
-            print("检测到database中有文件被删除，且目标文件夹中没有多余文件")
-            print("是否要将database中文件的 assaini 字段设置为1？")
-            print("-" * 100)
+        if assaini_by_filename:
+            if db_not_in_folder and not folder_not_in_db:
+                print("\n" + "-" * 100)
+                print("检测到database中有文件被删除，且目标文件夹中没有多余文件")
+                print("是否要将database中文件的 assaini 字段设置为1？")
+                print("-" * 100)
 
-            user_input = input("请确认 (yes/y/N): ").strip().lower()
+                user_input = input("请确认 (yes/y/N): ").strip().lower()
 
-            if user_input == 'yes' or user_input == 'y':
-                # 获取所有需要更新的文件ID
-                file_ids = [file_id for file_id, _ in db_not_in_folder]
+                if user_input == 'yes' or user_input == 'y':
+                    # 获取所有需要更新的文件ID
+                    file_ids = [file_id for file_id, _ in db_not_in_folder]
 
-                # 使用参数化查询更新assaini字段
-                placeholders = ','.join('?' for _ in file_ids)
-                update_query = f"UPDATE files SET assaini = 1 WHERE id IN ({placeholders})"
+                    # 使用参数化查询更新assaini字段
+                    placeholders = ','.join('?' for _ in file_ids)
+                    update_query = f"UPDATE files SET assaini = 1 WHERE id IN ({placeholders})"
 
-                cursor.execute(update_query, file_ids)
-                conn.commit()
+                    cursor.execute(update_query, file_ids)
+                    conn.commit()
 
-                print(f"已成功更新 {len(file_ids)} 个文件的 assaini 字段为1")
-            else:
-                print("已跳过更新操作! ")
+                    print(f"已成功更新 {len(file_ids)} 个文件的 assaini 字段为1")
+                else:
+                    print("已跳过更新操作! ")
 
         return {
             'db_not_in_folder': db_not_in_folder,
