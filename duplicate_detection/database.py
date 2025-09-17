@@ -464,6 +464,125 @@ def existed_files_in_database(folder_path, db_file, delete_existed=False):
     print("=" * 50)
 
 
+from typing import List, Tuple, Dict, Any
+def check_matches_database_disk(database_path, location: int, folder_path, verbose: bool=True) -> Dict[str, List[Tuple[int, str]]]:
+    """
+    检查数据库中的文件路径是否与实际文件夹中的文件匹配
+
+    Args:
+        database_path: SQLite数据库文件路径
+        location: 要检查的location_id值
+        folder_path: 目标文件夹路径
+        verbose: 是否print打印检测信息
+
+    Returns:
+        包含两个列表的字典：
+        - 'db_not_in_folder': 在数据库中但不在文件夹中的文件（id, filepath）
+        - 'folder_not_in_db': 在文件夹中但不在数据库中的文件（id设为-1, filepath）
+    """
+    database_path = Path(database_path)
+    folder_path = Path(folder_path)
+
+    # 确保文件夹路径存在
+    if not os.path.exists(folder_path):
+        raise ValueError(f"文件夹路径不存在: {folder_path}")
+
+    # 连接数据库
+    conn = sqlite3.connect(database_path)
+    cursor = conn.cursor()
+
+    try:
+        # 从数据库获取指定location的文件
+        cursor.execute(
+            "SELECT id, filepath FROM files WHERE location_id = ?",
+            (location,)
+        )
+        db_files = cursor.fetchall()
+
+        # 获取文件夹中的所有文件（包括子目录）
+        folder_files = []
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                if file.startswith('.'):
+                    continue
+                # 获取相对路径（相对于目标文件夹）
+                full_path = os.path.join(root, file)
+                relative_path = os.path.relpath(full_path, folder_path)
+                folder_files.append(relative_path)
+
+        # 转换为集合以便快速查找
+        db_filepaths = {filepath for _, filepath in db_files}
+        folder_filepaths_set = set(folder_files)
+
+        # 找出在数据库中但不在文件夹中的文件
+        db_not_in_folder = [
+            (id, filepath) for id, filepath in db_files
+            if filepath not in folder_filepaths_set
+        ]
+
+        # 找出在文件夹中但不在数据库中的文件
+        folder_not_in_db = [
+            (-1, filepath) for filepath in folder_files
+            if filepath not in db_filepaths
+        ]
+
+        if verbose:
+            # 打印结果
+            print()
+            print(f"检查位置ID: {location}")
+            print(f"目标文件夹: {folder_path}")
+            print(f"数据库总文件数: {len(db_files)}")
+            print(f"文件夹总文件数: {len(folder_files)}")
+            print(f"\n总结:")
+            print(f"数据库中存在但文件夹中缺失的文件数: {len(db_not_in_folder)}")
+            print(f"文件夹中存在但数据库中缺失的文件数: {len(folder_not_in_db)}")
+
+            print("\n在数据库中但不在文件夹中的文件:")
+            for id, filepath in db_not_in_folder:
+                print(f"  ID: {id}, 路径: {filepath}")
+
+            print("\n在文件夹中但不在数据库中的文件:")
+            for id, filepath in folder_not_in_db:
+                print(f"  路径: {filepath}")
+
+        # 新增功能：如果db_not_in_folder不为空且folder_not_in_db为空，询问用户是否更新assaini字段
+        if db_not_in_folder and not folder_not_in_db:
+            print("\n" + "-" * 100)
+            print("检测到database中有文件被删除，且目标文件夹中没有多余文件")
+            print("是否要将database中文件的 assaini 字段设置为1？")
+            print("-" * 100)
+
+            user_input = input("请确认 (yes/y/N): ").strip().lower()
+
+            if user_input == 'yes' or user_input == 'y':
+                # 获取所有需要更新的文件ID
+                file_ids = [file_id for file_id, _ in db_not_in_folder]
+
+                # 使用参数化查询更新assaini字段
+                placeholders = ','.join('?' for _ in file_ids)
+                update_query = f"UPDATE files SET assaini = 1 WHERE id IN ({placeholders})"
+
+                cursor.execute(update_query, file_ids)
+                conn.commit()
+
+                print(f"已成功更新 {len(file_ids)} 个文件的 assaini 字段为1")
+            else:
+                print("已跳过更新操作! ")
+
+        return {
+            'db_not_in_folder': db_not_in_folder,
+            'folder_not_in_db': folder_not_in_db
+        }
+
+    except Exception as e:
+        # 如果出现错误，回滚任何更改
+        conn.rollback()
+        raise e
+
+    finally:
+        conn.close()
+
+
 if __name__ == '__main__':
     # 使用示例
     DATABASE_PATH = 'database/path/to.db'
