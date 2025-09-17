@@ -27,4 +27,7 @@ local_launchpad.py
 /video_preview/2previewer
 /video_preview/previewed
 yolo-process/database
+atest
+atest.*
+
 
