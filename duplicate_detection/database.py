@@ -255,7 +255,7 @@ def get_total_duplicates_size(db_path, deleted=0, location=None):
         return None
 
 
-def record_folders2database(db_path, pre_target_dir, target_dir, location):
+def record_folders2database(db_path, pre_target_dir, target_dir, location, askconfirm=True):
     """
     检测指定路径的第一层文件夹，并将文件夹名写入SQLite数据库，同时重命名原文件夹
 
@@ -266,7 +266,10 @@ def record_folders2database(db_path, pre_target_dir, target_dir, location):
         location (int): 文件夹数据库位置标签🏷️
     """
     # 询问用户确认
-    confirm = input(f"record_folders2database: 相同 location id 重复执行只添加新增的文件夹(y确认/N取消): ").strip().lower()
+    if askconfirm:
+        confirm = input(f"record_folders2database: 相同 location id 重复执行只添加新增的文件夹(y确认/N取消): ").strip().lower()
+    else:
+        confirm = 'y'
 
     if confirm == 'y' or confirm == 'yes' or confirm == 'y确认' or confirm == '确认':
         print('record_folders2database: 开始记录📝: ')
