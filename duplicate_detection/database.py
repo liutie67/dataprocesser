@@ -543,12 +543,12 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
             print(f"数据库中存在但文件夹中缺失的文件数: {len(db_not_in_folder)} (排除assaini=1)")
             print(f"文件夹中存在但数据库中缺失的文件数: {len(folder_not_in_db)}")
 
-            print("\n在数据库中但不在文件夹中的文件: (排除assaini=1)")
-            for id, filepath in db_not_in_folder:
+            print("\n在数据库中但不在文件夹中的文件(前100个): (排除assaini=1)")
+            for id, filepath in db_not_in_folder[0:100]:
                 print(f"  ID: {id}, 路径: {filepath}")
 
-            print("\n在文件夹中但不在数据库中的文件: ")
-            for id, filepath in folder_not_in_db:
+            print("\n在文件夹中但不在数据库中的文件(前100个): ")
+            for id, filepath in folder_not_in_db[0:100]:
                 print(f"  路径: {filepath}")
 
         # 新增功能：如果db_not_in_folder不为空且folder_not_in_db为空，询问用户是否更新assaini字段
@@ -641,7 +641,7 @@ def classer(database_path, location: int, folder_path, verbose: bool = True) -> 
                     folder_file_hashes[file_hash] = {
                         'path': full_path,
                         'filename': file,
-                        'relative_path': os.path.relpath(full_path, folder_path)
+                        'relative_path': os.path.relpath(full_path, folder_path.parent)
                     }
                 except Exception as e:
                     if verbose:
@@ -687,6 +687,14 @@ def classer(database_path, location: int, folder_path, verbose: bool = True) -> 
             print(f"成功匹配的文件数: {len(matched_files)}")
             print(f"数据库中存在但文件夹中无匹配的文件数: {len(unmatched_db_files)}")
             print(f"文件夹中存在但数据库中无匹配的文件数: {len(unmatched_folder_files)}")
+
+            print("\n数据库中存在但文件夹中无匹配的文件(前100个): ")
+            for filepath in unmatched_db_files[0:100]:
+                print(f"  路径: {filepath}")
+
+            print("\n文件夹中存在但数据库中无匹配的文件数(前100个): ")
+            for hash in unmatched_folder_files[0:100]:
+                print(f"  路径: {folder_file_hashes[hash]['relative_path']}")
 
         # 处理文件名模式匹配和更新
         updated_files = []
