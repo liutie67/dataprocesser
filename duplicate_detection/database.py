@@ -1,7 +1,8 @@
 import os.path
 import sqlite3
 from pathlib import Path
-
+from typing import List, Tuple, Dict, Any
+import re
 from tqdm import tqdm
 
 from duplicate_detection.hash import hash_file_complet, hash_file_fast
@@ -464,7 +465,6 @@ def existed_files_in_database(folder_path, db_file, delete_existed=False):
     print("=" * 50)
 
 
-from typing import List, Tuple, Dict, Any
 def check_matches_database_disk(database_path, location: int, folder_path, verbose: bool=True, assaini_by_filename=False) -> Dict[str, List[Tuple[int, str]]]:
     """
     检查数据库中的文件路径是否与实际文件夹中的文件匹配
@@ -585,10 +585,197 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
         conn.close()
 
 
+def classer(database_path, location: int, folder_path, verbose: bool = True) -> Dict[str, Any]:
+    """
+    通过SHA256哈希值匹配数据库文件和实际文件，处理mark字段和文件名更新
+
+    Args:
+        database_path: SQLite数据库文件路径
+        location: 要检查的location_id值
+        folder_path: 目标文件夹路径
+        verbose: 是否print打印检测信息
+
+    Returns:
+        包含匹配结果的字典
+    """
+    database_path = Path(database_path)
+    folder_path = Path(folder_path)
+
+    # 确保文件夹路径存在
+    if not folder_path.exists():
+        raise ValueError(f"文件夹路径不存在: {folder_path}")
+
+    # 连接数据库
+    conn = sqlite3.connect(database_path)
+    cursor = conn.cursor()
+
+    try:
+        # 从数据库获取指定location的文件（包含sha256字段）
+        cursor.execute(
+            "SELECT id, filepath, filename, sha256 FROM files WHERE location_id = ? AND sha256 IS NOT NULL",
+            (location,)
+        )
+        db_files = cursor.fetchall()
+
+        if verbose:
+            print(f"\n数据库中有 {len(db_files)} 个文件具有SHA256值")
+
+        # 扫描文件夹中的所有文件并计算哈希值
+        folder_file_hashes = {}
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                if file.startswith('.'):
+                    continue
+                full_path = Path(root) / file
+                try:
+                    file_hash = hash_file_fast(str(full_path))
+                    folder_file_hashes[file_hash] = {
+                        'path': full_path,
+                        'filename': file,
+                        'relative_path': os.path.relpath(full_path, folder_path)
+                    }
+                except Exception as e:
+                    if verbose:
+                        print(f"计算文件哈希失败: {full_path}, 错误: {e}")
+
+        if verbose:
+            print(f"成功计算 {len(folder_file_hashes)} 个文件的哈希值")
+
+        # 创建数据库文件的哈希映射
+        db_hash_mapping = {sha256: (id, filepath, filename) for id, filepath, filename, sha256 in db_files}
+
+        # 找出匹配的文件（哈希值相同）
+        matched_files = []
+        unmatched_db_files = []  # 数据库中有但文件夹中没有匹配哈希的文件
+        unmatched_folder_files = list(folder_file_hashes.keys())  # 初始化，后续会移除匹配的
+
+        for sha256, file_info in folder_file_hashes.items():
+            if sha256 in db_hash_mapping:
+                db_id, db_filepath, db_filename = db_hash_mapping[sha256]
+                matched_files.append({
+                    'db_id': db_id,
+                    'db_filepath': db_filepath,
+                    'db_filename': db_filename,
+                    'actual_path': file_info['path'],
+                    'actual_filename': file_info['filename'],
+                    'relative_path': file_info['relative_path'],
+                    'sha256': sha256
+                })
+                unmatched_folder_files.remove(sha256)
+            else:
+                # 这个文件不在数据库中（通过哈希匹配）
+                pass
+
+        # 找出数据库中有但文件夹中没有匹配的文件
+        db_hashes = set(db_hash_mapping.keys())
+        folder_hashes = set(folder_file_hashes.keys())
+        unmatched_db_hashes = db_hashes - folder_hashes
+        unmatched_db_files = [(db_hash_mapping[hash][0], db_hash_mapping[hash][1])
+                              for hash in unmatched_db_hashes]
+
+        if verbose:
+            print(f"\nclasser(): 匹配结果:")
+            print(f"成功匹配的文件数: {len(matched_files)}")
+            print(f"数据库中存在但文件夹中无匹配的文件数: {len(unmatched_db_files)}")
+            print(f"文件夹中存在但数据库中无匹配的文件数: {len(unmatched_folder_files)}")
+
+        # 处理文件名模式匹配和更新
+        updated_files = []
+        pattern = re.compile(r'^(\d)-(.+)$')  # 匹配以数字和-开头的文件名，并捕获数字和剩余部分
+
+        unit = 1
+        for match in matched_files:
+            db_filepath = match['db_filepath']
+            db_filename = match['db_filename']
+            actual_filename = match['actual_filename']
+            actual_relative_path = match['relative_path']
+            db_id = match['db_id']
+
+            # 从filepath中提取文件名部分（去掉目录路径）
+            filepath_filename = os.path.basename(db_filepath)
+
+            # 检查实际文件名是否与filepath中的文件名不同
+            filename_changed = (filepath_filename != actual_filename)
+
+            # 只有在文件名发生变化时才处理mark信息
+            if filename_changed:
+                mark_value = None
+                new_filename_without_prefix = actual_filename  # 默认使用完整文件名
+
+                # 检查新文件名是否符合模式
+                match_result = pattern.match(actual_filename)
+                if match_result:
+                    mark_value = int(match_result.group(1))
+                    new_filename_without_prefix = match_result.group(2)  # 去掉"数字-"前缀的部分
+
+                if verbose:
+                    print(f"\n{unit}: 检测到文件名变化:")
+                    unit = unit + 1
+                    print(f"  数据库ID: {db_id}")
+                    print(f"  原文件名: {db_filename}")
+                    print(f"  新文件名: {actual_filename}")
+                    if mark_value is not None:
+                        print(f"  提取的mark值: {mark_value}")
+                        print(f"  去除前缀后的文件名: {new_filename_without_prefix}")
+
+                # 构建更新SQL
+                if mark_value is not None:
+                    # 更新mark、filepath和filename字段
+                    cursor.execute(
+                        "UPDATE files SET mark = ?, filepath = ?, filename = ? WHERE id = ?",
+                        (mark_value, actual_relative_path, new_filename_without_prefix, db_id)
+                    )
+                    update_type = "mark、filepath和filename"
+                else:
+                    # 只更新filepath和filename字段（保持filename为完整的新文件名）
+                    cursor.execute(
+                        "UPDATE files SET filepath = ?, filename = ? WHERE id = ?",
+                        (actual_relative_path, actual_filename, db_id)
+                    )
+                    update_type = "filepath和filename"
+
+                conn.commit()
+
+                updated_files.append({
+                    'db_id': db_id,
+                    'old_filename': db_filename,
+                    'new_filename': actual_filename,
+                    'new_filename_in_db': new_filename_without_prefix if mark_value is not None else actual_filename,
+                    'old_filepath': db_filepath,
+                    'new_filepath': actual_relative_path,
+                    'mark': mark_value,
+                    'update_type': update_type
+                })
+
+                if verbose:
+                    print(f"  已更新数据库: {update_type}")
+
+        if verbose and updated_files:
+            print(f"\n总共更新了 {len(updated_files)} 个文件的文件名和相关信息")
+
+        return {
+            'matched_files': matched_files,
+            'unmatched_db_files': unmatched_db_files,
+            'unmatched_folder_files': [folder_file_hashes[hash] for hash in unmatched_folder_files],
+            'updated_files': updated_files,
+            'total_matched': len(matched_files),
+            'total_updated': len(updated_files)
+        }
+
+    except Exception as e:
+        conn.rollback()
+        if verbose:
+            print(f"发生错误: {e}")
+        raise e
+    finally:
+        conn.close()
+
+# 使用示例
 if __name__ == '__main__':
     # 使用示例
     DATABASE_PATH = 'database/path/to.db'
     predir = 'path/to/pre/target'
+    location = 1
 
     delete_duplicate_files(
         db_path=DATABASE_PATH,
@@ -614,3 +801,22 @@ if __name__ == '__main__':
         db_path=DATABASE_PATH,
         file_path="/home/user/test2.txt",
     )
+
+    result = classer(
+        database_path=DATABASE_PATH,
+        location=location,
+        folder_path="/path/to/your/folder",
+        verbose=True
+    )
+    print(f"\n最终结果:")
+    print(f"匹配文件数: {result['total_matched']}")
+    print(f"更新文件数: {result['total_updated']}")
+    print(f"数据库缺失匹配: {len(result['unmatched_db_files'])}")
+    print(f"文件夹缺失匹配: {len(result['unmatched_folder_files'])}")
+    # 打印更新详情
+    if result['updated_files']:
+        print(f"\n更新详情:")
+        for update in result['updated_files']:
+            print(f"  ID {update['db_id']}: {update['old_filepath']} -> {update['new_filepath']}")
+            if update['mark'] is not None:
+                print(f"      mark设置为: {update['mark']}")
