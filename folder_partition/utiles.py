@@ -60,7 +60,7 @@ def get_dir_size(folder) -> int:
 
     try:
         for item in folder.rglob('*'):
-            if item.is_file():
+            if item.is_file() and not item.name.startswith('.'):
                 try:
                     total_size += item.stat().st_size
                 except (OSError, PermissionError) as e:
