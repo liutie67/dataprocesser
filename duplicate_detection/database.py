@@ -498,7 +498,7 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
     try:
         # 从数据库获取指定location的文件
         cursor.execute(
-            "SELECT id, filepath FROM files WHERE location_id = ?",
+            "SELECT id, filepath, assaini FROM files WHERE location_id = ?",
             (location,)
         )
         db_files = cursor.fetchall()
@@ -515,13 +515,13 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
                 folder_files.append(relative_path)
 
         # 转换为集合以便快速查找
-        db_filepaths = {filepath for _, filepath in db_files}
+        db_filepaths = {filepath for _, filepath, assaini in db_files if assaini != 1}
         folder_filepaths_set = set(folder_files)
 
         # 找出在数据库中但不在文件夹中的文件
         db_not_in_folder = [
-            (id, filepath) for id, filepath in db_files
-            if filepath not in folder_filepaths_set
+            (id, filepath) for id, filepath, assaini in db_files
+            if filepath not in folder_filepaths_set and assaini != 1
         ]
 
         # 找出在文件夹中但不在数据库中的文件
@@ -537,15 +537,17 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
             print(f"目标文件夹: {folder_path}")
             print(f"数据库总文件数: {len(db_files)}")
             print(f"文件夹总文件数: {len(folder_files)}")
+            print(f"数据库中assaini=1的文件数: {sum(1 for _, _, assaini in db_files if assaini == 1)}")
+
             print(f"\n总结:")
-            print(f"数据库中存在但文件夹中缺失的文件数: {len(db_not_in_folder)}")
+            print(f"数据库中存在但文件夹中缺失的文件数: {len(db_not_in_folder)} (排除assaini=1)")
             print(f"文件夹中存在但数据库中缺失的文件数: {len(folder_not_in_db)}")
 
-            print("\n在数据库中但不在文件夹中的文件:")
+            print("\n在数据库中但不在文件夹中的文件: (排除assaini=1)")
             for id, filepath in db_not_in_folder:
                 print(f"  ID: {id}, 路径: {filepath}")
 
-            print("\n在文件夹中但不在数据库中的文件:")
+            print("\n在文件夹中但不在数据库中的文件: ")
             for id, filepath in folder_not_in_db:
                 print(f"  路径: {filepath}")
 
