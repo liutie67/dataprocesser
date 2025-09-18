@@ -54,13 +54,13 @@ def pipeline(path_db, predir, todir, location: int, threshsize=10):
         classer(
             database_path=path_db,
             location=location,
-            folder_path=predir,
+            folder_path=predir / todir,
         )
     elif mode == "e" or mode == "d" or mode == "m":
         check_matches_database_disk(
             database_path=path_db,
             location=location,
-            folder_path=predir,
+            folder_path=predir / todir,
             assaini_by_filename=True,
         )
 

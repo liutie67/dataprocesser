@@ -511,7 +511,7 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
                     continue
                 # 获取相对路径（相对于目标文件夹）
                 full_path = os.path.join(root, file)
-                relative_path = os.path.relpath(full_path, folder_path)
+                relative_path = os.path.relpath(full_path, folder_path.parent)
                 folder_files.append(relative_path)
 
         # 转换为集合以便快速查找
@@ -627,6 +627,7 @@ def classer(database_path, location: int, folder_path, verbose: bool = True) -> 
 
         # 扫描文件夹中的所有文件并计算哈希值
         folder_file_hashes = {}
+        hash_calculate_nums = 0
         for root, dirs, files in os.walk(folder_path):
             for file in files:
                 if file.startswith('.'):
@@ -634,6 +635,9 @@ def classer(database_path, location: int, folder_path, verbose: bool = True) -> 
                 full_path = Path(root) / file
                 try:
                     file_hash = hash_file_fast(str(full_path))
+                    hash_calculate_nums += 1
+                    if hash_calculate_nums % 1000 == 0:
+                        print(f" - 已计算 {hash_calculate_nums} 个哈希值. ")
                     folder_file_hashes[file_hash] = {
                         'path': full_path,
                         'filename': file,
