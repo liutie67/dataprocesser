@@ -1,5 +1,6 @@
 import os.path
 import sqlite3
+import unicodedata
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
 import re
@@ -503,6 +504,13 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
         )
         db_files = cursor.fetchall()
 
+        def normalize_unicode(text):
+            """统一Unicode标准化形式"""
+            if not isinstance(text, str):
+                text = str(text, 'utf-8', errors='ignore')
+            # 使用NFKC标准化（兼容性分解后重新组合）
+            return unicodedata.normalize('NFKC', text)
+
         # 获取文件夹中的所有文件（包括子目录）
         folder_files = []
         for root, dirs, files in os.walk(folder_path):
@@ -512,22 +520,25 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
                 # 获取相对路径（相对于目标文件夹）
                 full_path = os.path.join(root, file)
                 relative_path = os.path.relpath(full_path, folder_path.parent)
-                folder_files.append(relative_path)
+                folder_files.append(normalize_unicode(relative_path))
 
         # 转换为集合以便快速查找
-        db_filepaths = {filepath for _, filepath, assaini in db_files if assaini != 1}
+        db_filepaths = {normalize_unicode(filepath) for _, filepath, assaini in db_files if assaini != 1}
         folder_filepaths_set = set(folder_files)
+
+
+
 
         # 找出在数据库中但不在文件夹中的文件
         db_not_in_folder = [
             (id, filepath) for id, filepath, assaini in db_files
-            if filepath not in folder_filepaths_set and assaini != 1
+            if normalize_unicode(filepath) not in folder_filepaths_set and assaini != 1
         ]
 
         # 找出在文件夹中但不在数据库中的文件
         folder_not_in_db = [
             (-1, filepath) for filepath in folder_files
-            if filepath not in db_filepaths
+            if normalize_unicode(filepath) not in db_filepaths
         ]
 
         if verbose:
