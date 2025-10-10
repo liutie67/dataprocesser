@@ -7,7 +7,7 @@ from duplicate_detection.database import get_total_duplicates_size, delete_dupli
 from duplicate_detection.database import check_matches_database_disk, classer
 
 
-def pipeline(path_db, predir, todir, location: int, threshsize=10):
+def pipeline(path_db, predir, todir, location: int, threshsize=10, show_missing_num=100):
     print(f"- 当前 location: {location}")
     print(f"- 当前 database: {path_db}")
     print(f"- 当前 predir: {predir}")
@@ -62,6 +62,7 @@ def pipeline(path_db, predir, todir, location: int, threshsize=10):
             location=location,
             folder_path=predir / todir,
             assaini_by_filename=True,
+            show_missing_num=show_missing_num,
         )
 
     else:

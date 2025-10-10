@@ -469,7 +469,7 @@ def existed_files_in_database(folder_path, db_file, delete_existed=False):
     print("=" * 50)
 
 
-def check_matches_database_disk(database_path, location: int, folder_path, verbose: bool=True, assaini_by_filename=False) -> Dict[str, List[Tuple[int, str]]]:
+def check_matches_database_disk(database_path, location: int, folder_path, verbose: bool=True, assaini_by_filename=False, show_missing_num=100) -> Dict[str, List[Tuple[int, str]]]:
     """
     检查数据库中的文件路径是否与实际文件夹中的文件匹配
 
@@ -479,6 +479,7 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
         folder_path: 目标文件夹路径
         verbose: 是否print打印检测信息
         assaini_by_filename: 是否根据文件名称标记 assaini 字段
+        show_missing_num: 显示的缺失的条目，默认100条
 
     Returns:
         包含两个列表的字典：
@@ -554,12 +555,20 @@ def check_matches_database_disk(database_path, location: int, folder_path, verbo
             print(f"数据库中存在但文件夹中缺失的文件数: {len(db_not_in_folder)} (排除assaini=1)")
             print(f"文件夹中存在但数据库中缺失的文件数: {len(folder_not_in_db)}")
 
-            print("\n在数据库中但不在文件夹中的文件(前100个): (排除assaini=1)")
-            for id, filepath in db_not_in_folder[0:100]:
+            if show_missing_num <= len(db_not_in_folder):
+                smn_db_not_in_folder = show_missing_num
+            else:
+                smn_db_not_in_folder = len(db_not_in_folder)
+            print(f"\n在数据库中但不在文件夹中的文件(前{smn_db_not_in_folder}个): (排除assaini=1)")
+            for id, filepath in db_not_in_folder[0:smn_db_not_in_folder]:
                 print(f"  ID: {id}, 路径: {filepath}")
 
-            print("\n在文件夹中但不在数据库中的文件(前100个): ")
-            for id, filepath in folder_not_in_db[0:100]:
+            if show_missing_num <= len(folder_not_in_db):
+                smn_folder_not_in_db = show_missing_num
+            else:
+                smn_folder_not_in_db = len(folder_not_in_db)
+            print(f"\n在文件夹中但不在数据库中的文件(前{smn_folder_not_in_db}个): ")
+            for id, filepath in folder_not_in_db[0:smn_folder_not_in_db]:
                 print(f"  路径: {filepath}")
 
         # 新增功能：如果db_not_in_folder不为空且folder_not_in_db为空，询问用户是否更新assaini字段
