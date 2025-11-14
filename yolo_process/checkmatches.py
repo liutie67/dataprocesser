@@ -1,4 +1,6 @@
 """
+Step 2 checkmatches.py
+
 检查并清理指定相对目录path中images和labels文件夹不匹配的图像和标签文件
 """
 

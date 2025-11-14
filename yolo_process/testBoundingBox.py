@@ -1,3 +1,7 @@
+"""
+Step 6 testBoundingBox.py
+"""
+
 import os
 import cv2
 import numpy as np

@@ -1,4 +1,6 @@
 """
+Step 4 rewritelabel.py
+
 给我python代码，将指定images_0文件夹的所有图片复制到另一个images_1文件夹，同名的图片则跳过。
 同样指定labels_0文件夹的.txt标签文件也复制到labels_1文件夹，但是同名的txt文件合并，
 每个txt文件的一行是一个标记，

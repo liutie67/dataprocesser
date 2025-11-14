@@ -1,3 +1,7 @@
+"""
+Step 5 split_data.py
+"""
+
 import os
 import shutil
 import random

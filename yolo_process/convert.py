@@ -1,5 +1,6 @@
-# convert.py
 """
+Step 1 convert.py
+
 将指定相对目录path的.jpg和.txt分别放在path新建的images和lables文件夹中
 """
 
