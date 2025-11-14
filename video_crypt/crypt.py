@@ -136,7 +136,7 @@ if __name__ == '__main__':
     print(type(key))
     print(len(key))
     print(base64.b64encode(key))
-    # input_path = '../yolo-process/database/test-d38bc61df8084f119a21bcbbb55d1423.png'
+    # input_path = '../yolo_process/database/test-d38bc61df8084f119a21bcbbb55d1423.png'
     input_path = '/media/liutie/备用盘/video/mdg/default-默认/2022-07-30-20-48-54BV1Pt4y1V7Wd【海豹故事会】727直播回放，顺着网线来找你.mp4'
 
     filename = input_path.split('/')[-1].split('.')[0]
