@@ -26,6 +26,7 @@ def mediatranscryption(
         cols=4,
         preview_width=1980,
         previewOnly=False,
+        detached_prevew=None,
 ):
     """
     遍历目录并加密/解密文件，支持删除源文件、多线程、保存文件名映射。
@@ -146,7 +147,11 @@ def mediatranscryption(
                         enc_name = string_to_hash(f)
                         src_file = os.path.join(root, f)
                         dst_file = os.path.join(new_root, enc_name)
-                        map_dir = mapping_dir_map.get(root) if save_mapping else None
+                        if detached_prevew:
+                            os.makedirs(detached_prevew, exist_ok=True)
+                            map_dir = detached_prevew if save_mapping else None
+                        else:
+                            map_dir = mapping_dir_map.get(root) if save_mapping else None
                         futures.append(
                             executor.submit(
                                 process_file, src_file, dst_file, encrypt, delete_source, map_dir, f, enc_name
