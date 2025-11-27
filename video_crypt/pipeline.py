@@ -84,7 +84,7 @@ def mediatranscryption(
                             log_f.write(enc_name)
                 else:
                     # 否则保存原始文件
-                    file_path = os.path.join(map_dir, orig_name)
+                    file_path = os.path.join(map_dir, f"{enc_name}-{orig_name}")
                     shutil.copyfile(src_file, file_path)
             else:
 
@@ -94,7 +94,7 @@ def mediatranscryption(
                         log_f.write(enc_name)
 
         if save_preview and encrypt and map_dir:
-            generate_video_preview(src_file, os.path.join(map_dir, f"{orig_name}.png"), rows=rows, cols=cols, preview_width=preview_width)
+            generate_video_preview(src_file, os.path.join(map_dir, f"{enc_name}-{orig_name}.png"), rows=rows, cols=cols, preview_width=preview_width)
 
         if delete_source:
             try:
