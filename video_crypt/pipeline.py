@@ -11,7 +11,7 @@ from video_crypt.key_manager import load_key
 from video_crypt.utils import string_to_hash
 
 
-def copy_with_fixed_random_suffix(
+def mediatranscryption(
         src_dir,
         dst_dir,
         encrypt=True,
@@ -19,12 +19,14 @@ def copy_with_fixed_random_suffix(
         mapping_pictures=False,
         use_multithreading=True,
         num_threads=None,
-        save_mapping=True,
-        save_preview=True,
+        save_mapping=False,
+        save_preview=False,
+        logging=False,
         rows=4,
         cols=4,
         preview_width=1980,
-        previewOnly=False
+        previewOnly=False,
+        detached_prevew=None,
 ):
     """
     遍历目录并加密/解密文件，支持删除源文件、多线程、保存文件名映射。
@@ -77,19 +79,22 @@ def copy_with_fixed_random_suffix(
             if mapping_pictures:
                 if is_video_file(src_file):
                     log_path = os.path.join(map_dir, f"{orig_name}.log")
-                    with open(log_path, "w", encoding="utf-8") as log_f:
-                        log_f.write(enc_name)
+                    if logging:
+                        with open(log_path, "w", encoding="utf-8") as log_f:
+                            log_f.write(enc_name)
                 else:
                     # 否则保存原始文件
-                    file_path = os.path.join(map_dir, orig_name)
+                    file_path = os.path.join(map_dir, f"{enc_name}-{orig_name}")
                     shutil.copyfile(src_file, file_path)
             else:
+
                 log_path = os.path.join(map_dir, f"{orig_name}.log")
-                with open(log_path, "w", encoding="utf-8") as log_f:
-                    log_f.write(enc_name)
+                if logging:
+                    with open(log_path, "w", encoding="utf-8") as log_f:
+                        log_f.write(enc_name)
 
         if save_preview and encrypt and map_dir:
-            generate_video_preview(src_file, os.path.join(map_dir, f"{orig_name}.png"), rows=rows, cols=cols, preview_width=preview_width)
+            generate_video_preview(src_file, os.path.join(map_dir, f"{enc_name}-{orig_name}.png"), rows=rows, cols=cols, preview_width=preview_width)
 
         if delete_source:
             try:
@@ -142,7 +147,11 @@ def copy_with_fixed_random_suffix(
                         enc_name = string_to_hash(f)
                         src_file = os.path.join(root, f)
                         dst_file = os.path.join(new_root, enc_name)
-                        map_dir = mapping_dir_map.get(root) if save_mapping else None
+                        if detached_prevew:
+                            os.makedirs(detached_prevew, exist_ok=True)
+                            map_dir = detached_prevew if save_mapping else None
+                        else:
+                            map_dir = mapping_dir_map.get(root) if save_mapping else None
                         futures.append(
                             executor.submit(
                                 process_file, src_file, dst_file, encrypt, delete_source, map_dir, f, enc_name
@@ -166,7 +175,7 @@ if __name__ == "__main__":
     # 设置源目录和目标目录
     source_directory = '/some/path/2encrypt'
     target_directory = 'encrypted'
-    copy_with_fixed_random_suffix(
+    mediatranscryption(
         source_directory,
         target_directory,
         encrypt=True,
@@ -177,7 +186,7 @@ if __name__ == "__main__":
     # 设置源目录和目标目录
     source_directory = 'encrypted/some/path'
     target_directory = 'decrypted'
-    copy_with_fixed_random_suffix(
+    mediatranscryption(
         source_directory,
         target_directory,
         encrypt=False,
