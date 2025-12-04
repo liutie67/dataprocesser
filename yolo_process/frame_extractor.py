@@ -88,7 +88,7 @@ def extract_frames_from_video(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 将视频名称信息注入 prefix
-    prefix = prefix + '_' +  string_to_hash(prefix, 8)
+    prefix = prefix + '_' +  string_to_hash(str(video_path), 8)
 
     # 1. 打开视频
     # 注意：cv2.VideoCapture 在某些 Windows 环境下对中文路径支持不佳
