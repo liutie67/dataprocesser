@@ -203,12 +203,13 @@ def batch_extract_from_directory(
         **kwargs: 传递给 extract_frames_from_video 的参数。
 
     Examples:
-        >>> batch_extract_from_directory(
-        >>>     input_dir="folder/to/videos",
-        >>>     output_base="folder/to/save/frames",
-        >>>     frame_interval=10,
-        >>>     prefix='f',
-        >>> )
+        >>> if __name__ == "__main__":
+        >>>     batch_extract_from_directory(
+        >>>         input_dir="folder/to/videos",
+        >>>         output_base="folder/to/save/frames",
+        >>>         frame_interval=10,
+        >>>         prefix='f',
+        >>>     )
     """
     input_path = Path(input_dir)
     output_path = Path(output_base)
