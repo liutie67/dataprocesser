@@ -1,7 +1,7 @@
 import os.path
 from pathlib import Path
 
-from folder_partition.partition import split_folder_by_size, verify_folder_sizes
+from folders_files.partition import split_folder_by_size, verify_folder_sizes
 from duplicate_detection.exacte_duplicata_detection import add_files2database
 from duplicate_detection.database import get_total_duplicates_size, delete_duplicate_files, record_folders2database
 from duplicate_detection.database import check_matches_database_disk, classer

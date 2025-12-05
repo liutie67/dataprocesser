@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Tuple
 import time
 
-from folder_partition.utiles import remove_empty_folders, get_dir_size
+from folders_files.utiles import remove_empty_folders, get_dir_size
 
 
 def split_folder_by_size(folderpath: str, threshsize: float=20, use_decimal=True) -> List[Path]:
