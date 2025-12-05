@@ -15,9 +15,9 @@ import os
 import argparse
 
 
-def check_and_clean_dataset(folder_name, delete=False, mode='sep'):
+def check_and_clean_dataset(source_dir, delete=False, mode='sep'):
     """
-    检查并清理不匹配的图像和标签文件。
+    检查并清理不匹配的图像和标签文件。检查 source_dir 下 images, labels 文件夹里的匹配情况。
 
     该函数会：
     1. 检查指定目录下的images和labels文件夹
@@ -26,7 +26,7 @@ def check_and_clean_dataset(folder_name, delete=False, mode='sep'):
     4. 可选删除这些不匹配的文件
 
     Args:
-        folder_name (str): 包含images和labels文件夹的父目录路径
+        source_dir (str): 包含images和labels文件夹的父目录路径
         delete (bool): 是否直接删除不匹配的文件，默认为False（只显示不删除）
         mode (str): 文件组织模式，'sep'表示图片和标签分开存放（默认），
                    'tog'表示图片和标签在同一目录（当前版本仅支持'sep'模式）
@@ -50,16 +50,16 @@ def check_and_clean_dataset(folder_name, delete=False, mode='sep'):
         >>> check_and_clean_dataset('./fire-smoke/combined')
     """
     # 定义图片和标签文件夹路径
-    images_dir = os.path.join(folder_name, 'images')
-    labels_dir = os.path.join(folder_name, 'labels')
+    images_dir = os.path.join(source_dir, 'images')
+    labels_dir = os.path.join(source_dir, 'labels')
 
     # 确保文件夹存在
     if not os.path.exists(images_dir):
-        raise FileNotFoundError(f"错误: images文件夹不存在于 {folder_name}")
+        raise FileNotFoundError(f"错误: images文件夹不存在于 {source_dir}")
     if not os.path.exists(labels_dir):
-        raise FileNotFoundError(f"错误: labels文件夹不存在于 {folder_name}")
+        raise FileNotFoundError(f"错误: labels文件夹不存在于 {source_dir}")
 
-    print(f"🔍 开始检查数据集: {folder_name}")
+    print(f"🔍 开始检查数据集: {source_dir}")
     print(f"📁 图片目录: {images_dir}")
     print(f"📁 标签目录: {labels_dir}")
 
@@ -148,9 +148,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog='''
 使用示例:
-  python checkmatches.py ./dataset              # 只检查不删除
-  python checkmatches.py ./dataset --delete     # 检查并删除不匹配文件
-  python checkmatches.py ./fire-smoke/combined  # 检查特定目录
+  python check_images_labels_match.py ./dataset              # 只检查不删除
+  python check_images_labels_match.py ./dataset --delete     # 检查并删除不匹配文件
+  python check_images_labels_match.py ./fire-smoke/combined  # 检查特定目录
         '''
     )
     parser.add_argument('folder', help='包含images和labels文件夹的目录路径')

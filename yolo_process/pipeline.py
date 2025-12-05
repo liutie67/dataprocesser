@@ -1,5 +1,5 @@
-from yolo_process.convert import convert
-from yolo_process.checkmatches import check_and_clean_dataset
+from yolo_process.separate_images_labels import separate_images_labels
+from yolo_process.check_images_labels_match import check_and_clean_dataset
 from yolo_process.split_data import split_yolo_dataset
 
 # Step 1 分开images和labels
