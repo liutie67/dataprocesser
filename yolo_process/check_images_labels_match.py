@@ -7,53 +7,54 @@ Step 2
 确保数据集中的每个图片都有对应的标签文件，每个标签文件都有对应的图片
 
 作者：LIU Tie
-版本：1.0
-日期：2025-11-14
+版本：2.0
+日期：2025-12-05
 """
 
 import os
+import shutil
 import argparse
 
 
-def check_and_clean_dataset(source_dir, delete=False, mode='sep'):
+def check_mismatches(source_dir, mode='sep'):
     """
-    检查并清理不匹配的图像和标签文件。检查 source_dir 下 images, labels 文件夹里的匹配情况。
+    检查数据集中的图像和标签匹配情况，并提供交互式的删除或归档选项。
 
-    该函数会：
-    1. 检查指定目录下的images和labels文件夹
-    2. 找出没有对应标签的图片文件
-    3. 找出没有对应图片的标签文件
-    4. 可选删除这些不匹配的文件
+    该函数扫描指定目录下的 'images' 和 'labels' 文件夹，找出不匹配的文件对。
+    如果发现不匹配项，程序将暂停并询问用户如何处理（删除、移动归档或忽略）。
 
-    Args:
-        source_dir (str): 包含images和labels文件夹的父目录路径
-        delete (bool): 是否直接删除不匹配的文件，默认为False（只显示不删除）
-        mode (str): 文件组织模式，'sep'表示图片和标签分开存放（默认），
-                   'tog'表示图片和标签在同一目录（当前版本仅支持'sep'模式）
+    Parameters
+    ----------
+    source_dir : str
+        包含 'images' 和 'labels' 子文件夹的数据集根目录路径。
+    mode : str, optional
+        文件组织模式。'sep' 表示图片和标签分开存放（默认）。
+        目前仅支持 'sep' 模式。
 
-    Returns:
-        tuple: 返回两个集合 (images_without_labels, labels_without_images)
-               - images_without_labels: 有图片但无标签的文件名集合（不含扩展名）
-               - labels_without_images: 有标签但无图片的文件名集合（不含扩展名）
+    Returns
+    -------
+    tuple
+        包含两个集合的元组 (images_without_labels, labels_without_images)：
+        - images_without_labels : set
+            存在图片但缺少对应标签的文件名集合（不含扩展名）。
+        - labels_without_images : set
+            存在标签但缺少对应图片的文件名集合（不含扩展名）。
 
-    Raises:
-        FileNotFoundError: 当指定的目录或images/labels文件夹不存在时
+    Raises
+    ------
+    FileNotFoundError
+        当指定的 source_dir 或其子文件夹 images/labels 不存在时抛出。
 
-    Example:
-        >>> # 基本用法：只检查不删除
-        >>> missing_images, missing_labels = check_and_clean_dataset('./dataset')
-        >>>
-        >>> # 检查并删除不匹配的文件
-        >>> check_and_clean_dataset('./dataset', delete=True)
-        >>>
-        >>> # 检查指定目录
-        >>> check_and_clean_dataset('./fire-smoke/combined')
+    Examples
+    --------
+    >>> # 运行函数，根据提示输入 'd' 删除或 'm' 移动
+    >>> unmatched_imgs, unmatched_lbls = check_mismatches('./my_dataset')
     """
-    # 定义图片和标签文件夹路径
+    # 定义基础路径
     images_dir = os.path.join(source_dir, 'images')
     labels_dir = os.path.join(source_dir, 'labels')
 
-    # 确保文件夹存在
+    # 路径检查
     if not os.path.exists(images_dir):
         raise FileNotFoundError(f"错误: images文件夹不存在于 {source_dir}")
     if not os.path.exists(labels_dir):
@@ -63,8 +64,8 @@ def check_and_clean_dataset(source_dir, delete=False, mode='sep'):
     print(f"📁 图片目录: {images_dir}")
     print(f"📁 标签目录: {labels_dir}")
 
-    # 获取所有图片和标签文件（不带扩展名）
-    # 使用集合进行快速差集运算
+    # 获取文件列表 (仅根据文件名匹配，忽略大小写)
+    # 假设图片为 .jpg, 标签为 .txt (基于原代码逻辑)
     image_files = {os.path.splitext(f)[0] for f in os.listdir(images_dir)
                    if f.lower().endswith('.jpg')}
     label_files = {os.path.splitext(f)[0] for f in os.listdir(labels_dir)
@@ -74,101 +75,118 @@ def check_and_clean_dataset(source_dir, delete=False, mode='sep'):
     print(f"   - 图片文件数量: {len(image_files)}")
     print(f"   - 标签文件数量: {len(label_files)}")
 
-    # 找出不匹配的文件
-    # 有图片但无标签的文件
+    # 计算差集
     images_without_labels = image_files - label_files
-    # 有标签但无图片的文件
     labels_without_images = label_files - image_files
 
-    # 显示检查结果
-    print("\n" + "="*50)
+    # -------------------------------------------------
+    # 结果展示
+    # -------------------------------------------------
+    print("\n" + "=" * 50)
     print("📋 检查结果:")
-    print("="*50)
+    print("=" * 50)
 
-    print(f"❌ 有图片但无标签的文件 ({len(images_without_labels)}个):")
+    has_mismatch = False
+
     if images_without_labels:
-        for file in sorted(images_without_labels):
-            print(f"   - {file}.jpg")
+        has_mismatch = True
+        print(f"❌ 有图片但无标签 (No Labels): {len(images_without_labels)} 个")
+        # 仅显示前5个作为示例，避免刷屏
+        for i, file in enumerate(sorted(images_without_labels)):
+            if i < 5: print(f"   - {file}.jpg")
+        if len(images_without_labels) > 5: print("   ... 等")
     else:
-        print("   ✅ 无此类文件")
+        print("✅ 所有图片都有对应的标签")
 
-    print(f"\n❌ 有标签但无图片的文件 ({len(labels_without_images)}个):")
+    print("-" * 30)
+
     if labels_without_images:
-        for file in sorted(labels_without_images):
-            print(f"   - {file}.txt")
+        has_mismatch = True
+        print(f"❌ 有标签但无图片 (No Images): {len(labels_without_images)} 个")
+        for i, file in enumerate(sorted(labels_without_images)):
+            if i < 5: print(f"   - {file}.txt")
+        if len(labels_without_images) > 5: print("   ... 等")
     else:
-        print("   ✅ 无此类文件")
+        print("✅ 所有标签都有对应的图片")
 
-    # 如果需要删除文件
-    if delete and (images_without_labels or labels_without_images):
-        print("\n🗑️ 开始删除不匹配的文件...")
-        deleted_count = 0
+    # -------------------------------------------------
+    # 交互处理逻辑
+    # -------------------------------------------------
+    if not has_mismatch:
+        print("\n🎉 完美! 数据集一一对应，无需处理。")
+        return images_without_labels, labels_without_images
 
-        # 删除无标签的图片文件
+    print("\n" + "=" * 50)
+    print("⚠️  发现不匹配文件，请选择操作:")
+    print("   [d] : 删除 (Delete) 所有不匹配的文件")
+    print("   [m] : 移动 (Move) 到同级 nolabels/noimages 文件夹")
+    print("   [n] : 不做任何操作 (No action)")
+
+    choice = input("\n👉 请输入您的选择 (d/m/n): ").strip().lower()
+
+    if choice == 'd':
+        print("\n🗑️  正在删除文件...")
+        cnt = 0
+        # 删除图片
         for file in images_without_labels:
-            img_path = os.path.join(images_dir, f"{file}.jpg")
             try:
-                os.remove(img_path)
-                print(f"   ✅ 已删除图片: {file}.jpg")
-                deleted_count += 1
-            except Exception as e:
-                print(f"   ❌ 删除失败 {file}.jpg: {e}")
+                os.remove(os.path.join(images_dir, f"{file}.jpg"))
+                cnt += 1
+            except OSError as e:
+                print(f"   删除失败: {file}.jpg - {e}")
 
-        # 删除无图片的标签文件
+        # 删除标签
         for file in labels_without_images:
-            label_path = os.path.join(labels_dir, f"{file}.txt")
             try:
-                os.remove(label_path)
-                print(f"   ✅ 已删除标签: {file}.txt")
-                deleted_count += 1
+                os.remove(os.path.join(labels_dir, f"{file}.txt"))
+                cnt += 1
+            except OSError as e:
+                print(f"   删除失败: {file}.txt - {e}")
+        print(f"✨ 已删除 {cnt} 个文件。")
+
+    elif choice == 'm':
+        print("\n📦 正在移动文件...")
+        # 定义移动的目标文件夹
+        # "nolabels" 存放没有标签的图片
+        target_no_labels = os.path.join(source_dir, 'nolabels')
+        # "noimages" 存放没有图片的标签
+        target_no_images = os.path.join(source_dir, 'noimages')
+
+        # 确保目标文件夹存在
+        if images_without_labels and not os.path.exists(target_no_labels):
+            os.makedirs(target_no_labels)
+            print(f"   创建文件夹: {target_no_labels}")
+
+        if labels_without_images and not os.path.exists(target_no_images):
+            os.makedirs(target_no_images)
+            print(f"   创建文件夹: {target_no_images}")
+
+        cnt = 0
+        # 移动图片
+        for file in images_without_labels:
+            src = os.path.join(images_dir, f"{file}.jpg")
+            dst = os.path.join(target_no_labels, f"{file}.jpg")
+            try:
+                shutil.move(src, dst)
+                cnt += 1
             except Exception as e:
-                print(f"   ❌ 删除失败 {file}.txt: {e}")
+                print(f"   移动失败: {file}.jpg - {e}")
 
-        print(f"\n✨ 删除完成! 总共删除了 {deleted_count} 个不匹配的文件")
-
-    elif delete:
-        print("\nℹ️ 无需删除：没有发现不匹配的文件")
+        # 移动标签
+        for file in labels_without_images:
+            src = os.path.join(labels_dir, f"{file}.txt")
+            dst = os.path.join(target_no_images, f"{file}.txt")
+            try:
+                shutil.move(src, dst)
+                cnt += 1
+            except Exception as e:
+                print(f"   移动失败: {file}.txt - {e}")
+        print(f"✨ 已移动 {cnt} 个文件到备份目录。")
 
     else:
-        if images_without_labels or labels_without_images:
-            print(f"\n💡 提示: 发现 {len(images_without_labels) + len(labels_without_images)} 个不匹配的文件")
-            print("   如需删除这些文件，请设置 delete=True")
-        else:
-            print("\n🎉 完美! 所有图片和标签文件都匹配!")
+        print("\n🛑 操作已取消，未修改任何文件。")
 
     return images_without_labels, labels_without_images
-
-
-def main():
-    """
-    命令行入口函数
-    """
-    parser = argparse.ArgumentParser(
-        description='检查并清理不匹配的图像和标签文件',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='''
-使用示例:
-  python check_images_labels_match.py ./dataset              # 只检查不删除
-  python check_images_labels_match.py ./dataset --delete     # 检查并删除不匹配文件
-  python check_images_labels_match.py ./fire-smoke/combined  # 检查特定目录
-        '''
-    )
-    parser.add_argument('folder', help='包含images和labels文件夹的目录路径')
-    parser.add_argument('--delete', action='store_true',
-                       help='是否直接删除不匹配的文件（谨慎使用）')
-
-    args = parser.parse_args()
-
-    try:
-        check_and_clean_dataset(args.folder, args.delete)
-    except FileNotFoundError as e:
-        print(f"❌ {e}")
-        return 1
-    except Exception as e:
-        print(f"❌ 发生错误: {e}")
-        return 1
-
-    return 0
 
 
 if __name__ == "__main__":
@@ -176,14 +194,7 @@ if __name__ == "__main__":
     path = './fire-smoke/combined'
 
     try:
-        # 只检查不删除
-        print("测试模式：只检查不删除")
-        missing_images, missing_labels = check_and_clean_dataset(path, delete=False)
-
-        # 如果需要测试删除功能，取消下面的注释
-        # print("\n" + "="*60)
-        # print("测试模式：检查并删除")
-        # check_and_clean_dataset(path, delete=True)
+        missing_images, missing_labels = check_mismatches(path)
 
     except FileNotFoundError as e:
         print(f"❌ 目录不存在: {e}")
