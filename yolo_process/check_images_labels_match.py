@@ -189,6 +189,130 @@ def check_mismatches(source_dir, mode='sep'):
     return images_without_labels, labels_without_images
 
 
+import os
+
+
+def generate_empty_labels_for_negative_samples(source_dir):
+    """
+    为指定目录下的所有图片生成同名的空标签文件（.txt），用于负样本训练。
+
+    该函数扫描 source_dir/images 目录下的图片，并在 source_dir/labels 目录中
+    查找对应的标签文件。对于每一个缺少标签文件的图片，它将创建一个空的 .txt 文件。
+    这通常用于 YOLO 等目标检测模型的负样本（纯背景图片）训练。
+
+    Parameters
+    ----------
+    source_dir : str
+        数据集的根目录，该目录下应包含 'images' 子文件夹。
+        程序会自动在该目录下查找或创建 'labels' 子文件夹。
+
+    Returns
+    -------
+    list
+        包含所有新创建的空标签文件路径的列表。
+
+    Raises
+    ------
+    FileNotFoundError
+        当 source_dir 下的 'images' 文件夹不存在时抛出。
+
+    Examples
+    --------
+    >>> # 为 background_images 文件夹下的图片生成空标签
+    >>> new_files = generate_empty_labels_for_negative_samples('./dataset/negative_samples')
+    """
+    # 定义文件夹路径
+    images_dir = os.path.join(source_dir, 'images')
+    labels_dir = os.path.join(source_dir, 'labels')
+
+    # 路径检查
+    if not os.path.exists(images_dir):
+        raise FileNotFoundError(f"错误: images文件夹不存在于 {source_dir}")
+
+    # 如果 labels 文件夹不存在，标记为需要创建
+    need_create_label_dir = not os.path.exists(labels_dir)
+
+    print(f"🔍 开始扫描负样本目录: {source_dir}")
+    print(f"📁 图片源目录: {images_dir}")
+    print(f"📁 标签目标目录: {labels_dir} {'(不存在，将自动创建)' if need_create_label_dir else ''}")
+
+    # 支持的图片扩展名
+    valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tif')
+
+    # 获取所有图片文件（不带扩展名）
+    image_files = [f for f in os.listdir(images_dir) if f.lower().endswith(valid_extensions)]
+    image_names = {os.path.splitext(f)[0] for f in image_files}
+
+    # 获取现有标签文件（如果不创建目录，则获取现有；否则为空）
+    existing_labels = set()
+    if not need_create_label_dir:
+        existing_labels = {os.path.splitext(f)[0] for f in os.listdir(labels_dir)
+                           if f.lower().endswith('.txt')}
+
+    # 计算需要生成的标签
+    # 逻辑：有图片 但 没有标签 的文件
+    missing_labels = sorted(list(image_names - existing_labels))
+
+    print(f"📊 统计信息:")
+    print(f"   - 扫描到的图片总数: {len(image_names)}")
+    print(f"   - 已存在的标签文件: {len(existing_labels)}")
+    print(f"   - 需要生成的空标签: {len(missing_labels)}")
+
+    # -------------------------------------------------
+    # 交互确认
+    # -------------------------------------------------
+    if not missing_labels:
+        print("\n🎉 完美! 所有图片都已经有了对应的标签文件，无需操作。")
+        return []
+
+    print("\n" + "=" * 50)
+    print("⚠️  准备执行以下操作:")
+    if need_create_label_dir:
+        print(f"   1. 创建目录: {labels_dir}")
+    print(f"   2. 批量创建 {len(missing_labels)} 个空 .txt 文件")
+    print("\n   注意: 这些文件将作为负样本（无目标）用于训练。")
+    print("   已存在的标签文件不会被覆盖。")
+
+    choice = input("\n👉 是否继续? (y/n): ").strip().lower()
+
+    created_files = []
+
+    if choice == 'y':
+        print("\n🛠️  开始处理...")
+
+        # 1. 创建目录
+        if need_create_label_dir:
+            try:
+                os.makedirs(labels_dir)
+                print(f"   ✅ 已创建标签目录: {labels_dir}")
+            except Exception as e:
+                print(f"   ❌ 创建目录失败: {e}")
+                return []
+
+        # 2. 批量创建空文件
+        success_count = 0
+        for name in missing_labels:
+            txt_path = os.path.join(labels_dir, f"{name}.txt")
+            try:
+                # 创建空文件
+                with open(txt_path, 'w') as f:
+                    pass
+                created_files.append(txt_path)
+                success_count += 1
+            except Exception as e:
+                print(f"   ❌ 创建失败: {name}.txt - {e}")
+
+        print(f"\n✨ 处理完成!")
+        print(f"   成功生成: {success_count} 个空标签文件")
+        print(f"   文件位置: {labels_dir}")
+
+    else:
+        print("\n🛑 操作已取消。")
+
+    return created_files
+
+
+
 if __name__ == "__main__":
     # 直接运行时的测试用例
     path = './fire-smoke/combined'
