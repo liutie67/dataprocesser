@@ -40,6 +40,89 @@ def move_files_by_count(source_dir, dest_dir, file_count, file_extensions=None, 
     return move_files(all_files[:file_count], dest_dir, file_count)
 
 
+def move_files_by_size(source_dir, dest_dir, target_size_gb, file_extensions=None, exclude_hidden=True,
+                       sort_mode='default', scaling=1000):
+    """
+    移动文件直到达到指定的大小（GB），尽可能接近但不超过该大小。
+
+    参数:
+        source_dir (str): 源目录
+        dest_dir (str): 目标目录
+        target_size_gb (float): 目标大小，单位为 GB
+        file_extensions (list): 文件后缀过滤
+        exclude_hidden (bool): 排除隐藏文件
+        scaling (1000 or 1024): MB到GB的进制
+        sort_mode (str): 文件选择策略
+            - 'default': 按文件名/系统顺序扫描
+            - 'random': 随机打乱后选择
+            - 'asc': 从小到大优先（能移动更多数量的文件）
+            - 'desc': 从大到小优先（优先移动大文件）
+    """
+
+    # 1. 基础单位转换 (1 GB = scaling^3 Bytes)
+    target_bytes = target_size_gb * (scaling ** 3)
+
+    # 2. 收集所有符合条件的文件
+    all_files_paths = collect_files(source_dir, file_extensions, exclude_hidden)
+
+    if not all_files_paths:
+        print("未找到符合条件的文件。")
+        return None
+
+    # 3.以此获取文件大小信息，构建 (path, size) 列表
+    files_with_size = []
+    for fp in all_files_paths:
+        try:
+            s = os.path.getsize(fp)
+            if s > 0:  # 排除0字节文件
+                files_with_size.append((fp, s))
+        except OSError:
+            continue
+
+    print(f"找到 {len(files_with_size)} 个有效文件，准备筛选...")
+
+    # 4. 根据策略排序
+    if sort_mode == 'random':
+        random.shuffle(files_with_size)
+    elif sort_mode == 'asc':
+        # 按大小升序（优先塞满小文件，通常能让总大小更接近目标值）
+        files_with_size.sort(key=lambda x: x[1])
+    elif sort_mode == 'desc':
+        # 按大小降序
+        files_with_size.sort(key=lambda x: x[1], reverse=True)
+
+    # 5. 贪心算法选择文件
+    selected_files = []
+    current_bytes = 0
+
+    for file_path, file_size in files_with_size:
+        # 如果加上这个文件不超过目标大小，则添加
+        if current_bytes + file_size <= target_bytes:
+            selected_files.append(file_path)
+            current_bytes += file_size
+        else:
+            # 如果是随机或默认模式，可以继续尝试找更小的文件来填缝
+            # 如果不想为了填缝遍历所有文件，可以在这里 break
+            continue
+
+    # 6. 打印统计信息
+    current_gb = current_bytes / (scaling ** 3)
+    print(f"-" * 30)
+    print(f"筛选结果:")
+    print(f"目标大小: {target_size_gb:.2f} GB")
+    print(f"实际选中: {current_gb:.4f} GB")
+    print(f"选中数量: {len(selected_files)} 个文件")
+    print(f"剩余空间: {(target_bytes - current_bytes) / (scaling ** 2):.2f} MB")
+    print(f"-" * 30)
+
+    if len(selected_files) == 0:
+        print("警告: 没有选中任何文件（可能是因为单个文件大小超过了目标限制）。")
+        return None
+
+    # 7. 调用原有的 move_files 函数执行移动
+    return move_files(selected_files, dest_dir, len(selected_files))
+
+
 def move_random_files(source_dir, dest_dir, file_count, file_extensions=None, exclude_hidden=True, random_seed=None):
     """
     随机移动指定数量的文件到目标目录
