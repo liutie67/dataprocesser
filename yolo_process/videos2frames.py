@@ -143,6 +143,10 @@ def capture_training_data_v3(video_path, save_dir="dataset",
     cv2.imshow('YOLO Multi-Class Collector', intro_frame)
     print(">>> [就绪] 请按空格键开始播放...")
 
+    # === [v3.2.1新增] 初始化消息系统 ===
+    ui_message = ""  # 待显示的文字
+    ui_msg_end_time = 0  # 消息显示的截止时间(时间戳)
+
     # === [v3.2新增] 初始化历史记录栈 ===
     # 结构: [{'files': [图片路径list], 'csv_line': [csv数据list]}]
     history_stack = []
@@ -177,14 +181,26 @@ def capture_training_data_v3(video_path, save_dir="dataset",
         # --- UI 绘制 ---
         display_img = current_frame.copy()
 
-        info_text = f"Frame: {curr_pos}/{total_frames} | Speed: {speed_multiplier}x"
-        cv2.putText(display_img, info_text, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (174, 20, 255), 2)
+        # 1. 基础信息
+        info_text = f"Frame: {curr_pos}/{total_frames} | Speed: x{speed_multiplier}"
+        cv2.putText(display_img, info_text, (20, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (174, 20, 255), 2)
 
+        # 2. 菜单提示
         # 动态生成按键提示菜单 (使用初始化时生成的 display_labels)
         # 使用 join 拼接，如果名字太长可能需要你手动调整字体大小或位置
         menu_text = " ".join(display_labels)
-        cv2.putText(display_img, menu_text, (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (5, 255, 5), 1)
+        cv2.putText(display_img, menu_text, (20, 80),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (5, 255, 5), 1)
 
+        # 3. [v3.2.1核心修改] 全局消息显示逻辑
+        # 如果当前时间还没过截止时间，或者消息是永久的(end_time=-1)，就显示
+        if ui_message and (time.time() < ui_msg_end_time or ui_msg_end_time == -1):
+            # 绘制显眼的黄色文字
+            cv2.putText(display_img, ui_message, (20, 120),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+
+        # 4. 状态提示
         status_text = "PAUSED" if paused else "PLAYING"
         color = (0, 0, 255) if paused else (0, 255, 0)
         cv2.putText(display_img, status_text, (display_img.shape[1] - 150, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
@@ -247,17 +263,19 @@ def capture_training_data_v3(video_path, save_dir="dataset",
                 csv_file = open(csv_path, mode='a', newline='', encoding='utf-8')
                 csv_writer = csv.writer(csv_file)
 
-                # UI 反馈
-                undo_text = f"UNDO SUCCESS! Stack: {len(history_stack)}"
-                # 刷新画面去掉之前的 'Saved' 提示，显示 Undo
-                display_img = current_frame.copy()
-                cv2.putText(display_img, undo_text, (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
-                # 补回基础UI (为了不让画面太空，简单的补一下)
-                cv2.putText(display_img, "PAUSED", (display_img.shape[1] - 150, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                            (0, 0, 255), 2)
-                cv2.imshow('YOLO Multi-Class Collector', display_img)
+                # [v3.2.1修改] UI 反馈：更新全局消息
+                ui_message = f"UNDO SUCCESS! Stack: {len(history_stack)}"
+                ui_msg_end_time = time.time() + 3.0  # 显示3秒
+
+                # v3.2.1
+                # 注意：撤回后我们还在 paused 状态，主循环会 waitKey(0)
+                # 这时因为 loop 还没重绘，我们需要continue跳过本次循环剩余部分
+                # 直接强行进入下一轮循环，利用主循环头部的 draw 逻辑来刷新画面
+                continue
             else:
                 print(" >> 历史栈为空，无法撤回")
+                ui_message = "Stack Empty! Nothing to undo."
+                ui_msg_end_time = time.time() + 2.0
         elif paused and (key == ord('d') or key == ord('f')):
             # --- [修正] 微调逻辑 ---
             # d (后退): 想看上一帧，就是 current - 1
@@ -329,22 +347,39 @@ def capture_training_data_v3(video_path, save_dir="dataset",
                 'csv_row': csv_row_data
             })
 
-            # (C) UI 反馈与暂停锁定
+            # (C) [v3.2.1修改] UI 反馈：更新全局消息变量
+            ui_message = f"Class [{class_label.upper()}] Saved! (Stack: {len(history_stack)})"
             feedback_text = f"Class [{class_label.upper()}] Saved! (Stack: {len(history_stack)})"
             cv2.putText(display_img, feedback_text, (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
             cv2.imshow('YOLO Multi-Class Collector', display_img)
 
             # 如果是暂停状态，强制等待空格
             if paused:
+                # v3.2.1
+                # 暂停时，我们希望文字一直显示，直到按下空格
+                ui_msg_end_time = -1  # -1 代表永久显示
+
+                # v3.2.1
+                # 手动刷新一帧，确保进入等待循环前文字能显示出来
+                # 因为主循环的imshow在上面，这里不刷新的话要等按键后才变
+                # 简单复用上面的绘制逻辑有点麻烦，这里直接简易绘制一下用于过渡
+                temp_img = display_img.copy()  # 复用刚才主循环画好的图
+                cv2.putText(temp_img, ui_message, (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+                cv2.imshow('YOLO Multi-Class Collector', temp_img)
+
                 while True:
                     sub_key = cv2.waitKey(0) & 0xFF
-                    if sub_key == 32:
+                    if sub_key == 32:  # 空格
+                        ui_message = ""  # 清除消息
                         break
-                    elif sub_key == 27:
+                    elif sub_key == 27:  # ESC
                         cap.release()
                         cv2.destroyAllWindows()
                         csv_file.close()
                         return
+            else:
+                # 播放时，显示 2 秒后自动消失
+                ui_msg_end_time = time.time() + 2.0
 
         # --- 正常播放 ---
         if not paused:
