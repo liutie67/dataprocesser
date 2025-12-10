@@ -265,7 +265,10 @@ def capture_training_data_v3(video_path, save_dir="dataset",
         if curr_pos in global_marked_frames:
             m_label = global_marked_frames[curr_pos]
             # 获取对应的颜色，如果没有则用灰色
-            m_color = CLASS_COLORS.get(keys2colors[class_names.index(m_label)], CLASS_COLORS['default'])
+            if m_label in class_names:
+                m_color = CLASS_COLORS.get(keys2colors[class_names.index(m_label)], CLASS_COLORS['default'])
+            else:
+                m_color = CLASS_COLORS.get(m_label, CLASS_COLORS['default'])
             marker_text = f"[MARKED: CLASS_{m_label.upper()}]"
 
             # 在屏幕正中央显示
@@ -310,7 +313,10 @@ def capture_training_data_v3(video_path, save_dir="dataset",
             if total_frames > 0:
                 # 计算标记在进度条上的 x 坐标
                 m_x = int((m_fid / total_frames) * img_w)
-                m_c = CLASS_COLORS.get(m_lbl, CLASS_COLORS[keys2colors[class_names.index(m_lbl)]])
+                if m_lbl in class_names:
+                    m_c = CLASS_COLORS.get(m_lbl, CLASS_COLORS[keys2colors[class_names.index(m_lbl)]])
+                else:
+                    m_c = CLASS_COLORS.get(m_lbl, CLASS_COLORS[m_lbl])
                 # 绘制一条竖线代表标记
                 cv2.line(display_img, (m_x, bar_y), (m_x, bar_y + bar_height), m_c, 2)
 
