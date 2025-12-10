@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def capture_training_data_v3(video_path, save_dir="dataset",
-                             extract_num=3, interval=5, mode='full',
+                             extract_num=5, interval=5, mode='full',
                              class_names=[]):  # <--- 新增 class_names 参数
     """
     交互式多类别视频数据采集工具 V3.2
