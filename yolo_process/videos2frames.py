@@ -7,12 +7,13 @@ from pathlib import Path
 
 def capture_training_data_v3(video_path, save_dir="dataset",
                              extract_num=5, interval=5, mode='full',
-                             class_names=[]):  # <--- 新增 class_names 参数
+                             class_names=None):  # <--- 新增 class_names 参数
     """
-    交互式多类别视频数据采集工具 V3.2
+    交互式多类别视频数据采集工具 V3.3
 
     - v3.1 新增 class_names 参数支持自定义按键语义。
     - v3.2 新增撤回操作功能。
+    - v3.3 新增进度条、时间轴标记可视化、重启程序自动加载已有标记。
 
     支持多键分类(z/x/c/v/b)，仅向前回溯截取，并自动分文件夹存储。
 
@@ -53,6 +54,16 @@ def capture_training_data_v3(video_path, save_dir="dataset",
     # 定义基础按键列表 (顺序对应 z, x, c, v, b)
     BASE_KEYS = [ord('z'), ord('x'), ord('c'), ord('v'), ord('b')]
     BASE_CHARS = ['z', 'x', 'c', 'v', 'b']
+    # === [v3.3 新增] 类别颜色映射 (BGR格式) ===
+    # Z:红, X:绿, C:蓝, V:黄, B:青
+    CLASS_COLORS = {
+        'z': (0, 0, 255),
+        'x': (0, 255, 0),
+        'c': (255, 0, 0),
+        'v': (0, 255, 255),
+        'b': (255, 255, 0),
+        'default': (200, 200, 200)
+    }
 
     KEY_MAP = {}
     display_labels = []  # 用于UI显示
@@ -78,6 +89,29 @@ def capture_training_data_v3(video_path, save_dir="dataset",
     csv_path = output_root / f"{video_name}_labels.csv"
     file_exists = csv_path.exists()
 
+    # === [v3.3 新增] 预读取 CSV 到内存字典，用于回显和进度条绘制 ===
+    # 结构: { frame_id(int): class_label_suffix(str) }  例如: {150: 'z'}
+    global_marked_frames = {}
+
+    if file_exists:
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                next(reader, None)  # 跳过表头
+                for row in reader:
+                    if len(row) >= 4:
+                        try:
+                            f_id = int(row[1])
+                            c_label = row[3]  # 格式通常是 "class_z"
+                            # 提取后缀 'z' 用于颜色映射，如果格式不对则保留原样
+                            short_label = c_label.split('_')[-1] if '_' in c_label else c_label
+                            global_marked_frames[f_id] = short_label
+                        except ValueError:
+                            continue
+            print(f"--- [v3.3] 已加载历史标记: {len(global_marked_frames)} 条 ---")
+        except Exception as e:
+            print(f"警告: 读取历史CSV失败 - {e}")
+
     csv_file = open(csv_path, mode='a', newline='', encoding='utf-8')
     csv_writer = csv.writer(csv_file)
     if not file_exists:
@@ -88,7 +122,10 @@ def capture_training_data_v3(video_path, save_dir="dataset",
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     base_fps = cap.get(cv2.CAP_PROP_FPS)
 
-    print(f"--- 启动采集 V3.1: {video_name} ---")
+    # 窗口设置 (允许调整大小以适应进度条)
+    cv2.namedWindow('YOLO Multi-Class Collector', cv2.WINDOW_NORMAL)
+
+    print(f"--- 启动采集 V3.3: {video_name} ---")
     print(f"保存路径: {output_root}")
     print("---------------------------------------------------------")
     print("【当前按键映射】")
@@ -151,7 +188,8 @@ def capture_training_data_v3(video_path, save_dir="dataset",
     # 结构: [{'files': [图片路径list], 'csv_line': [csv数据list]}]
     history_stack = []
 
-    # 2. 强制等待循环
+    # 2. 等待开始逻辑
+    print(">>> [就绪] 请按空格键开始播放...")
     while True:
         start_key = cv2.waitKey(0) & 0xFF
         if start_key == 32:  # Space
@@ -161,7 +199,6 @@ def capture_training_data_v3(video_path, save_dir="dataset",
             cv2.destroyAllWindows()
             csv_file.close()
             return
-
     # === 修改结束 ===
 
     # --- 状态变量 ---
@@ -180,6 +217,7 @@ def capture_training_data_v3(video_path, save_dir="dataset",
 
         # --- UI 绘制 ---
         display_img = current_frame.copy()
+        img_h, img_w = display_img.shape[:2]
 
         # --- 辅助函数：绘制带阴影的文字 ---
         def draw_shadow_text(img, text, pos, scale, color, thickness, offset=2):
@@ -198,6 +236,27 @@ def capture_training_data_v3(video_path, save_dir="dataset",
         menu_text = " ".join(display_labels)
         draw_shadow_text(display_img, menu_text, (20, 80), 0.6, (0, 140, 255), 1, offset=1)
 
+        # === [v3.3 新增] 历史标记回显 (Ghost Marker) ===
+        # 如果当前帧在已标记列表中，显示醒目的提示
+        if curr_pos in global_marked_frames:
+            m_label = global_marked_frames[curr_pos]
+            # 获取对应的颜色，如果没有则用灰色
+            m_color = CLASS_COLORS.get(m_label, CLASS_COLORS['default'])
+            marker_text = f"[MARKED: CLASS_{m_label.upper()}]"
+
+            # 在屏幕正中央显示
+            text_size = cv2.getTextSize(marker_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 3)[0]
+            center_x = (img_w - text_size[0]) // 2
+            center_y = (img_h // 2)
+
+            # 画一个半透明背景框让文字更清楚
+            overlay = display_img.copy()
+            cv2.rectangle(overlay, (center_x - 10, center_y - 40),
+                          (center_x + text_size[0] + 10, center_y + 10), (0, 0, 0), -1)
+            cv2.addWeighted(overlay, 0.5, display_img, 0.5, 0, display_img)
+
+            draw_shadow_text(display_img, marker_text, (center_x, center_y), 1.5, m_color, 3)
+
         # 3. [v3.2.1核心修改] 全局消息显示逻辑
         # 如果当前时间还没过截止时间，或者消息是永久的(end_time=-1)，就显示
         if ui_message and (time.time() < ui_msg_end_time or ui_msg_end_time == -1):
@@ -207,7 +266,29 @@ def capture_training_data_v3(video_path, save_dir="dataset",
         # 4. 状态提示
         status_text = "PAUSED" if paused else "PLAYING"
         color = (0, 0, 255) if paused else (0, 255, 0)
-        draw_shadow_text(display_img, status_text, (display_img.shape[1] - 150, 40), 0.7, color, 2)
+        draw_shadow_text(display_img, status_text, (img_w - 150, 40), 0.7, color, 2)
+
+        # === [v3.3 新增] 底部进度条与时间轴标记 ===
+        bar_height = 20
+        bar_margin = 30  # 距离底部的距离
+        bar_y = img_h - bar_margin
+
+        # (A) 绘制进度条底槽 (深灰色)
+        cv2.rectangle(display_img, (0, bar_y), (img_w, bar_y + bar_height), (50, 50, 50), -1)
+
+        # (B) 绘制当前进度 (白色半透明)
+        if total_frames > 0:
+            prog_width = int((curr_pos / total_frames) * img_w)
+            cv2.rectangle(display_img, (0, bar_y), (prog_width, bar_y + bar_height), (200, 200, 200), -1)
+
+        # (C) 绘制时间轴上的标记点
+        for m_fid, m_lbl in global_marked_frames.items():
+            if total_frames > 0:
+                # 计算标记在进度条上的 x 坐标
+                m_x = int((m_fid / total_frames) * img_w)
+                m_c = CLASS_COLORS.get(m_lbl, CLASS_COLORS['default'])
+                # 绘制一条竖线代表标记
+                cv2.line(display_img, (m_x, bar_y), (m_x, bar_y + bar_height), m_c, 2)
 
         cv2.imshow('YOLO Multi-Class Collector', display_img)
 
@@ -252,6 +333,13 @@ def capture_training_data_v3(video_path, save_dir="dataset",
                 csv_file.close()  # 先关闭句柄
 
                 try:
+                    # 获取要删除的帧ID，用于更新内存中的标记字典
+                    # csv_row结构: [time, frame_id, ms, label, mode]
+                    frame_id_to_remove = int(last_record['csv_row'][1])
+                    # === [v3.3] 从内存字典中移除，进度条上的线会立即消失 ===
+                    if frame_id_to_remove in global_marked_frames:
+                        del global_marked_frames[frame_id_to_remove]
+
                     with open(csv_path, 'r', encoding='utf-8') as f_read:
                         lines = f_read.readlines()
 
@@ -298,6 +386,24 @@ def capture_training_data_v3(video_path, save_dir="dataset",
         elif key in KEY_MAP:
             class_label = KEY_MAP[key]
             print(f" >> [{class_label.upper()}] 类触发: 帧 {curr_pos}")
+
+            # === [v3.3] 更新内存字典，以便进度条立即显示新标记 ===
+            # KEY_MAP里的 label 可能是 "kilometer" 也可能是 "z"
+            # 为了颜色映射方便，如果是自定义名字，我们需要反查出它是哪个按键对应的(z/x/c...)
+            # 这里简化处理：直接存入，在绘制时如果查不到颜色就用灰色
+            # 或者我们尽量存入短代码。这里为了逻辑简单，我们存入 class_label
+            # 但颜色映射需要稍微适配一下：
+
+            # 尝试找到对应的短代码(z/x/c)用于颜色
+            short_code = 'default'
+            for base_k, base_c in zip(BASE_KEYS, BASE_CHARS):
+                if key == base_k:
+                    short_code = base_c
+                    break
+
+            # 存入字典: key=帧号, value=短代码(用于颜色)
+            # 注意：这里存短代码是为了画图颜色方便。如果 csv 里存的是长名字，这里只是为了UI显示
+            global_marked_frames[curr_pos] = short_code
 
             # 准备数据
             time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -353,23 +459,21 @@ def capture_training_data_v3(video_path, save_dir="dataset",
 
             # (C) [v3.2.1修改] UI 反馈：更新全局消息变量
             ui_message = f"Class [{class_label.upper()}] Saved! (Stack: {len(history_stack)})"
-            feedback_text = f"Class [{class_label.upper()}] Saved! (Stack: {len(history_stack)})"
-            draw_shadow_text(display_img, feedback_text, (20, 120), 1, (0, 255, 255), 2)
-            # cv2.putText(display_img, feedback_text, (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-            cv2.imshow('YOLO Multi-Class Collector', display_img)
+            draw_shadow_text(display_img, ui_message, (20, 120), 1, (0, 255, 255), 2)
+            # 立即绘制刚刚加上的进度条竖线 (为了更好的交互体验，手动补画一笔，或者等待下一帧刷新)
+            # 这里选择刷新整个画面并暂停
+            # cv2.imshow('YOLO Multi-Class Collector', display_img)  # #############################################################
 
             # 如果是暂停状态，强制等待空格
             if paused:
-                # v3.2.1
-                # 暂停时，我们希望文字一直显示，直到按下空格
-                ui_msg_end_time = -1  # -1 代表永久显示
+                ui_msg_end_time = -1
+                # 重新在当前画面画图略显复杂，简单的方法是利用下一轮循环
+                # 但我们需要卡住暂停，所以这里拷贝一份 display_img 用于显示
+                # 注意：由于我们已经更新了 global_marked_frames，下一帧自然会有线
+                # 所以我们只需要显示文字并等待
+                temp_img = display_img.copy()
+                draw_shadow_text(temp_img, ui_message, (20, 120), 1, (0, 255, 255), 2)
 
-                # v3.2.1
-                # 手动刷新一帧，确保进入等待循环前文字能显示出来
-                # 因为主循环的imshow在上面，这里不刷新的话要等按键后才变
-                # 简单复用上面的绘制逻辑有点麻烦，这里直接简易绘制一下用于过渡
-                temp_img = display_img.copy()  # 复用刚才主循环画好的图
-                cv2.putText(temp_img, ui_message, (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                 cv2.imshow('YOLO Multi-Class Collector', temp_img)
 
                 while True:
