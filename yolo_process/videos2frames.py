@@ -1,3 +1,4 @@
+import os
 import cv2
 import csv
 import time
@@ -8,8 +9,10 @@ def capture_training_data_v3(video_path, save_dir="dataset",
                              extract_num=3, interval=5, mode='full',
                              class_names=[]):  # <--- 新增 class_names 参数
     """
-    交互式多类别视频数据采集工具 V3.1
-    (新增 class_names 参数支持自定义按键语义。)
+    交互式多类别视频数据采集工具 V3.2
+
+    - v3.1 新增 class_names 参数支持自定义按键语义。
+    - v3.2 新增撤回操作功能。
 
     支持多键分类(z/x/c/v/b)，仅向前回溯截取，并自动分文件夹存储。
 
@@ -140,6 +143,10 @@ def capture_training_data_v3(video_path, save_dir="dataset",
     cv2.imshow('YOLO Multi-Class Collector', intro_frame)
     print(">>> [就绪] 请按空格键开始播放...")
 
+    # === [v3.2新增] 初始化历史记录栈 ===
+    # 结构: [{'files': [图片路径list], 'csv_line': [csv数据list]}]
+    history_stack = []
+
     # 2. 强制等待循环
     while True:
         start_key = cv2.waitKey(0) & 0xFF
@@ -206,6 +213,51 @@ def capture_training_data_v3(video_path, save_dir="dataset",
             speed_multiplier = 3.0
         elif key == ord('5'):
             speed_multiplier = 0.5
+        # --- [v3.2新增] 撤回功能 (Backspace: ASCII 8) ---
+        elif paused and key == 8:
+            if len(history_stack) > 0:
+                print(" >> 正在撤回上一条记录...")
+                last_record = history_stack.pop()
+
+                # 1. 删除图片文件
+                for img_path in last_record['files']:
+                    try:
+                        if img_path.exists():
+                            os.remove(img_path)
+                            print(f"    已删除: {img_path.name}")
+                    except Exception as e:
+                        print(f"    删除失败: {e}")
+
+                # 2. 删除 CSV 最后一行 (需要关闭-读取-重写-重开)
+                csv_file.close()  # 先关闭句柄
+
+                try:
+                    with open(csv_path, 'r', encoding='utf-8') as f_read:
+                        lines = f_read.readlines()
+
+                    # 只有当文件有内容且不只有表头时才删除
+                    if len(lines) > 1:
+                        with open(csv_path, 'w', encoding='utf-8') as f_write:
+                            f_write.writelines(lines[:-1])  # 写回除最后一行外的所有行
+                            print("    CSV记录已回滚")
+                except Exception as e:
+                    print(f"    CSV回滚失败: {e}")
+
+                # 重新以追加模式打开 CSV
+                csv_file = open(csv_path, mode='a', newline='', encoding='utf-8')
+                csv_writer = csv.writer(csv_file)
+
+                # UI 反馈
+                undo_text = f"UNDO SUCCESS! Stack: {len(history_stack)}"
+                # 刷新画面去掉之前的 'Saved' 提示，显示 Undo
+                display_img = current_frame.copy()
+                cv2.putText(display_img, undo_text, (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                # 补回基础UI (为了不让画面太空，简单的补一下)
+                cv2.putText(display_img, "PAUSED", (display_img.shape[1] - 150, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+                            (0, 0, 255), 2)
+                cv2.imshow('YOLO Multi-Class Collector', display_img)
+            else:
+                print(" >> 历史栈为空，无法撤回")
         elif paused and (key == ord('d') or key == ord('f')):
             # --- [修正] 微调逻辑 ---
             # d (后退): 想看上一帧，就是 current - 1
@@ -225,11 +277,16 @@ def capture_training_data_v3(video_path, save_dir="dataset",
             class_label = KEY_MAP[key]
             print(f" >> [{class_label.upper()}] 类触发: 帧 {curr_pos}")
 
-            # (A) 写入 CSV
+            # 准备数据
             time_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            # 记录类别
-            csv_writer.writerow([time_str, curr_pos, f"{curr_ms:.2f}", f"class_{class_label}", mode])
+            csv_row_data = [time_str, curr_pos, f"{curr_ms:.2f}", f"class_{class_label}", mode]
+
+            # (A) 写入 CSV
+            csv_writer.writerow(csv_row_data)
             csv_file.flush()
+
+            # [v3.2新增] 记录本次产生的文件，用于撤回
+            current_batch_files = []
 
             save_count = 0
             if mode == 'full':
@@ -254,7 +311,11 @@ def capture_training_data_v3(video_path, save_dir="dataset",
                     if ret_temp:
                         # 文件名: 视频名_类别_帧号.jpg
                         fname = f"{video_name}_{class_label}_{f_idx:06d}.jpg"
-                        cv2.imwrite(str(class_dir / fname), frame_temp)
+                        full_path = class_dir / fname
+                        cv2.imwrite(str(full_path), frame_temp)
+
+                        # [v3.2新增] 将路径加入列表
+                        current_batch_files.append(full_path)
                         save_count += 1
 
                 # 4. 恢复位置
@@ -262,8 +323,14 @@ def capture_training_data_v3(video_path, save_dir="dataset",
                 ret, frame = cap.read()
                 if ret: current_frame = frame
 
+            # [v3.2新增] 将本次操作压入历史栈
+            history_stack.append({
+                'files': current_batch_files,
+                'csv_row': csv_row_data
+            })
+
             # (C) UI 反馈与暂停锁定
-            feedback_text = f"Class [{class_label.upper()}] Saved! Count: {save_count}"
+            feedback_text = f"Class [{class_label.upper()}] Saved! (Stack: {len(history_stack)})"
             cv2.putText(display_img, feedback_text, (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
             cv2.imshow('YOLO Multi-Class Collector', display_img)
 
