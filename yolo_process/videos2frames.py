@@ -158,8 +158,14 @@ def capture_training_data_v3(video_path, save_dir="dataset",
     # speed_multiplier = 1.0 ... (后续代码保持不变)
 
     while True:
-        curr_pos = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-        curr_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+        # --- [修正] 获取当前帧号 ---
+        # cap.read() 读完一帧后指针会自动+1，指向“下一帧”
+        # 所以我们需要 -1 才能得到“当前看到的这一帧”的正确索引
+        curr_pos = int(cap.get(cv2.CAP_PROP_POS_FRAMES)) - 1
+
+        # --- [修正] 重新计算时间戳 ---
+        # 建议直接用帧号换算，比 get(POS_MSEC) 更精准且与帧号严格对齐
+        curr_ms = (curr_pos / base_fps) * 1000.0 if base_fps > 0 else 0
 
         # --- UI 绘制 ---
         display_img = current_frame.copy()
@@ -201,8 +207,14 @@ def capture_training_data_v3(video_path, save_dir="dataset",
         elif key == ord('5'):
             speed_multiplier = 0.5
         elif paused and (key == ord('d') or key == ord('f')):
-            # 微调逻辑
-            target_pos = max(0, curr_pos - 2) if key == ord('d') else curr_pos
+            # --- [修正] 微调逻辑 ---
+            # d (后退): 想看上一帧，就是 current - 1
+            # f (前进): 想看下一帧，就是 current + 1
+            if key == ord('d'):
+                target_pos = max(0, curr_pos - 1)
+            else:  # key == 'f'
+                target_pos = curr_pos + 1
+
             cap.set(cv2.CAP_PROP_POS_FRAMES, target_pos)
             ret, frame = cap.read()
             if ret: current_frame = frame
