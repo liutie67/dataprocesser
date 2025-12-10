@@ -181,29 +181,33 @@ def capture_training_data_v3(video_path, save_dir="dataset",
         # --- UI 绘制 ---
         display_img = current_frame.copy()
 
+        # --- 辅助函数：绘制带阴影的文字 ---
+        def draw_shadow_text(img, text, pos, scale, color, thickness, offset=2):
+            x, y = pos
+            # 1. 绘制黑色阴影 (向右下偏移 offset 像素)
+            cv2.putText(img, text, (x + offset, y + offset), cv2.FONT_HERSHEY_SIMPLEX, scale, (0, 0, 0), thickness)
+            # 2. 绘制彩色正文
+            cv2.putText(img, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, color, thickness)
+
         # 1. 基础信息
         info_text = f"Frame: {curr_pos}/{total_frames} | Speed: x{speed_multiplier}"
-        cv2.putText(display_img, info_text, (20, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (174, 20, 255), 2)
+        draw_shadow_text(display_img, info_text, (20, 40), 0.7, (174, 20, 255), 2)
 
         # 2. 菜单提示
-        # 动态生成按键提示菜单 (使用初始化时生成的 display_labels)
-        # 使用 join 拼接，如果名字太长可能需要你手动调整字体大小或位置
+        # 动态生成按键提示菜单
         menu_text = " ".join(display_labels)
-        cv2.putText(display_img, menu_text, (20, 80),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (5, 255, 5), 1)
+        draw_shadow_text(display_img, menu_text, (20, 80), 0.6, (0, 140, 255), 1, offset=1)
 
         # 3. [v3.2.1核心修改] 全局消息显示逻辑
         # 如果当前时间还没过截止时间，或者消息是永久的(end_time=-1)，就显示
         if ui_message and (time.time() < ui_msg_end_time or ui_msg_end_time == -1):
             # 绘制显眼的黄色文字
-            cv2.putText(display_img, ui_message, (20, 120),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+            draw_shadow_text(display_img, ui_message, (20, 120), 1, (0, 255, 255), 2)
 
         # 4. 状态提示
         status_text = "PAUSED" if paused else "PLAYING"
         color = (0, 0, 255) if paused else (0, 255, 0)
-        cv2.putText(display_img, status_text, (display_img.shape[1] - 150, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+        draw_shadow_text(display_img, status_text, (display_img.shape[1] - 150, 40), 0.7, color, 2)
 
         cv2.imshow('YOLO Multi-Class Collector', display_img)
 
@@ -350,7 +354,8 @@ def capture_training_data_v3(video_path, save_dir="dataset",
             # (C) [v3.2.1修改] UI 反馈：更新全局消息变量
             ui_message = f"Class [{class_label.upper()}] Saved! (Stack: {len(history_stack)})"
             feedback_text = f"Class [{class_label.upper()}] Saved! (Stack: {len(history_stack)})"
-            cv2.putText(display_img, feedback_text, (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+            draw_shadow_text(display_img, feedback_text, (20, 120), 1, (0, 255, 255), 2)
+            # cv2.putText(display_img, feedback_text, (20, 120), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
             cv2.imshow('YOLO Multi-Class Collector', display_img)
 
             # 如果是暂停状态，强制等待空格
