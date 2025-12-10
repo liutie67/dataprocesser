@@ -265,7 +265,7 @@ def capture_training_data_v3(video_path, save_dir="dataset",
         if curr_pos in global_marked_frames:
             m_label = global_marked_frames[curr_pos]
             # 获取对应的颜色，如果没有则用灰色
-            m_color = CLASS_COLORS.get(m_label, CLASS_COLORS['default'])
+            m_color = CLASS_COLORS.get(keys2colors[class_names.index(m_label)], CLASS_COLORS['default'])
             marker_text = f"[MARKED: CLASS_{m_label.upper()}]"
 
             # 在屏幕正中央显示
@@ -279,7 +279,7 @@ def capture_training_data_v3(video_path, save_dir="dataset",
                           (center_x + text_size[0] + 10, center_y + 10), (0, 0, 0), -1)
             cv2.addWeighted(overlay, 0.5, display_img, 0.5, 0, display_img)
 
-            draw_shadow_text(display_img, marker_text, (center_x, center_y), 1.5, m_color, 3)
+            draw_shadow_text(display_img, marker_text, (center_x, center_y), 1.5, m_color, 3, offset=3)
 
         # 3. [v3.2.1核心修改] 全局消息显示逻辑
         # 如果当前时间还没过截止时间，或者消息是永久的(end_time=-1)，就显示
@@ -310,7 +310,7 @@ def capture_training_data_v3(video_path, save_dir="dataset",
             if total_frames > 0:
                 # 计算标记在进度条上的 x 坐标
                 m_x = int((m_fid / total_frames) * img_w)
-                m_c = CLASS_COLORS.get(m_lbl, CLASS_COLORS['default'])
+                m_c = CLASS_COLORS.get(m_lbl, CLASS_COLORS[keys2colors[class_names.index(m_lbl)]])
                 # 绘制一条竖线代表标记
                 cv2.line(display_img, (m_x, bar_y), (m_x, bar_y + bar_height), m_c, 2)
 
