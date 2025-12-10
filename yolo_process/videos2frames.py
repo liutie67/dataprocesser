@@ -186,7 +186,6 @@ def capture_training_data_v3(video_path, save_dir="dataset",
     cv2.putText(intro_frame, msg_sub, (x_sub, y_center + 50), font, 1.0, (0, 255, 0), 2)  # 本体
 
     cv2.imshow('YOLO Multi-Class Collector', intro_frame)
-    print(">>> [就绪] 请按空格键开始播放...")
 
     # === [v3.2.1新增] 初始化消息系统 ===
     ui_message = ""  # 待显示的文字
@@ -489,7 +488,7 @@ def capture_training_data_v3(video_path, save_dir="dataset",
 
             # (C) [v3.2.1修改] UI 反馈：更新全局消息变量
             ui_message = f"Class [{class_label.upper()}] Saved! (Stack: {len(history_stack)})"
-            draw_shadow_text(display_img, ui_message, (20, 120), 1, (0, 255, 255), 2)
+            draw_shadow_text(display_img, ui_message, (img_w//2 - 250, 100), 1, (0, 255, 255), 2)
             # 立即绘制刚刚加上的进度条竖线 (为了更好的交互体验，手动补画一笔，或者等待下一帧刷新)
             # 这里选择刷新整个画面并暂停
             # cv2.imshow('YOLO Multi-Class Collector', display_img)  # #############################################################
@@ -502,7 +501,7 @@ def capture_training_data_v3(video_path, save_dir="dataset",
                 # 注意：由于我们已经更新了 global_marked_frames，下一帧自然会有线
                 # 所以我们只需要显示文字并等待
                 temp_img = display_img.copy()
-                draw_shadow_text(temp_img, ui_message, (20, 120), 1, (0, 255, 255), 2)
+                draw_shadow_text(temp_img, ui_message, (img_w//2 - 250, 100), 1, (0, 255, 255), 2)
 
                 cv2.imshow('YOLO Multi-Class Collector', temp_img)
 
