@@ -57,12 +57,20 @@ def capture_training_data_v3(video_path, save_dir="dataset",
     # === [v3.3 新增] 类别颜色映射 (BGR格式) ===
     # Z:红, X:绿, C:蓝, V:黄, B:青
     CLASS_COLORS = {
-        'z': (0, 0, 255),
+        'z': (0, 69, 255),
         'x': (0, 255, 0),
-        'c': (255, 0, 0),
+        'c': (255, 165, 0),
         'v': (0, 255, 255),
         'b': (255, 255, 0),
         'default': (200, 200, 200)
+    }
+    keys2colors = {
+        0: 'z',
+        1: 'x',
+        2: 'c',
+        3: 'v',
+        4: 'b',
+        5: 'default'
     }
 
     KEY_MAP = {}
@@ -229,12 +237,28 @@ def capture_training_data_v3(video_path, save_dir="dataset",
 
         # 1. 基础信息
         info_text = f"Frame: {curr_pos}/{total_frames} | Speed: x{speed_multiplier}"
-        draw_shadow_text(display_img, info_text, (20, 40), 0.7, (174, 20, 255), 2)
+        draw_shadow_text(display_img, info_text, (20, 40), 1, (174, 20, 255), 2)
 
         # 2. 菜单提示
         # 动态生成按键提示菜单
-        menu_text = " ".join(display_labels)
-        draw_shadow_text(display_img, menu_text, (20, 80), 0.6, (0, 140, 255), 1, offset=1)
+        # menu_text = " ".join(display_labels)
+        # draw_shadow_text(display_img, menu_text, (20, 80), 0.6, (0, 140, 255), 1, offset=1)
+        # ---------------------------------------------------------
+        # 修改部分 1：左上角类别列表 (竖排显示，颜色跟随类别)
+        # ---------------------------------------------------------
+        ui_start_y = 80  # 起始高度
+        line_height = 30  # 行高
+
+        for i, name in enumerate(safe_class_names):
+            text = f"  [{keys2colors[i].upper()}]  {name}"
+            thickness = 2  # 或者设为1让非选中的细一点
+            # 【关键】直接获取该类别的定义颜色
+            this_color = CLASS_COLORS[keys2colors[i]]
+
+            # 绘制每一行 (y坐标随 i 增加)
+            # cv2.putText(frame, text, (10, ui_start_y + i * line_height),
+            #             cv2.FONT_HERSHEY_SIMPLEX, 0.7, this_color, thickness)
+            draw_shadow_text(display_img, text, (10, ui_start_y + i * line_height), 0.7, this_color, 1, offset=1)
 
         # === [v3.3 新增] 历史标记回显 (Ghost Marker) ===
         # 如果当前帧在已标记列表中，显示醒目的提示
@@ -266,7 +290,7 @@ def capture_training_data_v3(video_path, save_dir="dataset",
         # 4. 状态提示
         status_text = "PAUSED" if paused else "PLAYING"
         color = (0, 0, 255) if paused else (0, 255, 0)
-        draw_shadow_text(display_img, status_text, (img_w - 150, 40), 0.7, color, 2)
+        draw_shadow_text(display_img, status_text, (img_w - 150, 40), 1, color, 2)
 
         # === [v3.3 新增] 底部进度条与时间轴标记 ===
         bar_height = 20
