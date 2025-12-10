@@ -119,7 +119,7 @@ def capture_training_data_v3(video_path, save_dir="dataset",
     # "Hit Z/X/C/V/B at the LAST frame!"
     # "(Press SPACE to Start)"
     msg_title = "Hit Z/X/C/V/B at the LAST frame you can see object!"
-    msg_sub = "(Press SPACE to Start)"
+    msg_sub = "(Switch Input Method to ENG! & Press SPACE to Start)"
 
     font = cv2.FONT_HERSHEY_SIMPLEX
 
