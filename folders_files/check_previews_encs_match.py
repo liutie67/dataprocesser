@@ -40,7 +40,7 @@ def sync_directories(img_dir, label_dir, pre_num=32):
     # img_map: 键是文件名截取前pre_num位, 值是完整文件名(含.png)
     img_map = {}
     for f in os.listdir(img_dir):
-        if f.lower().endswith('.png'):
+        if f.lower().endswith('.png') and not f.startswith('.'):
             # 去除后缀
             name_no_ext = os.path.splitext(f)[0]
             # 核心修改：只取前pre_num个字符作为对比用的 Key
