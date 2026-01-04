@@ -45,9 +45,13 @@ def generate_video_preview(video_path, output_path, rows=4, cols=4, preview_widt
     for ts in timestamps:
         # 设置到指定时间点
         cap.set(cv2.CAP_PROP_POS_MSEC, ts * 1000)
-        ret, frame = cap.read()
-        if ret:
-            frames.append(frame)
+        try:
+            ret, frame = cap.read()
+            if ret:
+                frames.append(frame)
+        except Exception as e:
+            print(f"生成预览图时出错(截取frames出错) {video_path}: {str(e)}")
+            return False
 
     cap.release()
 
