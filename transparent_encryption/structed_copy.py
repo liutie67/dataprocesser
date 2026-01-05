@@ -2,6 +2,7 @@ import os
 import shutil
 import fnmatch
 import logging
+from datetime import datetime
 
 # --- 配置日志 ---
 logging.basicConfig(
@@ -67,6 +68,9 @@ def copy_selected_files(src_root, dst_root, rule_filename='.gitattributes', tole
     # 变更后: dst_root = .../transparent_encryption/dataprocesser
     # dst_root = os.path.join(dst_root, src_folder_name)
     # ---【核心修改点】结束 ---
+
+    structed_time_str = datetime.now().strftime('%Y%m%d(%H%M)')
+    dst_root = os.path.join(dst_root, structed_time_str)
 
     logging.info(f"源目录名称: [{dst_root}]")
     logging.info(f"最终导出目标: [{dst_root}]")
