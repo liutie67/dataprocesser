@@ -1,0 +1,14 @@
+[project]
+name = "dataprocesser"
+version = "1.0.0"
+description = "Personal data processor."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ezdxf>=1.4.3",
+    "numpy>=2.2.6",
+    "opencv-python>=4.12.0.88",
+    "pillow>=12.1.0",
+    "pycryptodome>=3.23.0",
+    "tqdm>=4.67.1",
+]
