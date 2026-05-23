@@ -102,28 +102,66 @@ def mediatranscryption(
             except OSError as e:
                 print(f"删除文件失败: {src_file} - {e}")
 
+    keep_all_failed = False
+
     with tqdm(total=total_tasks, desc="Processing", unit="item") as pbar:
         for root, dirs, files in os.walk(src_dir):
             if not encrypt:
                 dirs[:] = [d for d in dirs if '@' not in d]
 
-            # 处理目录
             if root == src_dir:
                 new_root = dst_dir
                 map_root = mapping_root if save_mapping else None
             else:
                 parent_src = os.path.dirname(root)
+                if parent_src not in dir_map:
+                    # 父目录已被跳过，跳过此目录及所有子目录
+                    dirs[:] = []
+                    pbar.update(1)
+                    continue
+
                 parent_new = dir_map[parent_src]
                 dir_name = os.path.basename(root)
                 if encrypt:
                     enc_dir_name = encrypt_folder_name(dir_name, load_key())
                 else:
-                    enc_dir_name = decrypt_folder_name(dir_name, load_key())
+                    skip_this = False
+                    try:
+                        enc_dir_name = decrypt_folder_name(dir_name, load_key())
+                    except Exception:
+                        if keep_all_failed:
+                            print(f"\n无法解密文件夹名，保持原名: {dir_name}")
+                            enc_dir_name = dir_name
+                        else:
+                            print(f"\n无法解密文件夹名: {dir_name}")
+                            while True:
+                                choice = input("选择操作 [y=保持原名 / n=跳过 / end=停止解密 / all=全部保持]: ").strip().lower()
+                                if choice in ('n', 'no'):
+                                    skip_this = True
+                                    break
+                                elif choice == 'end':
+                                    print("用户终止解密")
+                                    return
+                                elif choice in ('y', 'yes'):
+                                    enc_dir_name = dir_name
+                                    break
+                                elif choice == 'all':
+                                    keep_all_failed = True
+                                    enc_dir_name = dir_name
+                                    print(f"无法解密文件夹名，保持原名: {dir_name}")
+                                    break
+                                else:
+                                    print("无效选项，请输入 y/n/end/all")
+
+                    if skip_this:
+                        dirs[:] = []
+                        pbar.update(1)
+                        continue
+
                 new_root = os.path.join(parent_new, enc_dir_name)
 
                 if save_mapping:
                     parent_map_new = mapping_dir_map[parent_src]
-                    # 目录名 = 原名_加密名
                     map_dir_name = f"{dir_name}@{enc_dir_name}"
                     map_root = os.path.join(parent_map_new, map_dir_name)
                 else:
