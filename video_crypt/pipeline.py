@@ -27,6 +27,7 @@ def mediatranscryption(
         preview_width=1980,
         previewOnly=False,
         detached_prevew=None,
+        key_path=None,
 ):
     """
     遍历目录并加密/解密文件，支持删除源文件、多线程、保存文件名映射。
@@ -43,7 +44,9 @@ def mediatranscryption(
     :param cols: 预览图列数
     :param preview_width: 预览图的像素宽度，高度自动调整
     :param previewOnly: 只输出preview@文件夹,不输出加密文件
+    :param key_path: 密钥文件路径，None 则使用默认路径
     """
+    key = load_key(key_path)
     dir_map = {}
     mapping_dir_map = {}
 
@@ -70,9 +73,9 @@ def mediatranscryption(
         """单个文件处理函数"""
         if encrypt:
             if not previewOnly:
-                encrypt_file_with_name(src_file, dst_file, load_key())
+                encrypt_file_with_name(src_file, dst_file, key)
         else:
-            decrypt_file_with_name(src_file, os.path.dirname(dst_file), load_key())
+            decrypt_file_with_name(src_file, os.path.dirname(dst_file), key)
 
         if save_mapping and map_dir:
             # 如果 mapping_pictures 为真，则mapping图像源文件
@@ -123,11 +126,11 @@ def mediatranscryption(
                 parent_new = dir_map[parent_src]
                 dir_name = os.path.basename(root)
                 if encrypt:
-                    enc_dir_name = encrypt_folder_name(dir_name, load_key())
+                    enc_dir_name = encrypt_folder_name(dir_name, key)
                 else:
                     skip_this = False
                     try:
-                        enc_dir_name = decrypt_folder_name(dir_name, load_key())
+                        enc_dir_name = decrypt_folder_name(dir_name, key)
                     except Exception:
                         if keep_all_failed:
                             print(f"\n无法解密文件夹名，保持原名: {dir_name}")
