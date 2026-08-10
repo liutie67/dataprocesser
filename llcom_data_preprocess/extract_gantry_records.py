@@ -881,7 +881,7 @@ if __name__ == "__main__":
     INPUT_PATH = r"D:\门架摄像头视频（抓拍图+视频）\内宜数据20260718"
 
     # 输出根目录：脚本会在这里创建 front_view、label 和统计报告。
-    OUTPUT_PATH = r"C:\Users\imnew\projects\databases\llcom-reid-20260807"
+    OUTPUT_PATH = r"C:\Users\imnew\projects\databases\llcom-reid-20260810"
 
     # False：复制文件（默认，保留源文件）；True：移动文件。
     MOVE_FILES = False
