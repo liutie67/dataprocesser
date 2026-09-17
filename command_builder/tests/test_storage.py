@@ -1,4 +1,5 @@
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -88,3 +89,61 @@ def test_failed_replace_rolls_back(storage: Storage):
     with pytest.raises(Exception):
         storage.import_backup(backup, ImportMode.REPLACE)
     assert [item.name for item in storage.list_profiles()] == ["测试"]
+
+
+def test_migrates_v1_database_idempotently(tmp_path: Path):
+    database = tmp_path / "legacy.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            INSERT INTO metadata VALUES ('schema_version', '1');
+            CREATE TABLE profiles (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                script_path TEXT NOT NULL,
+                prefix TEXT NOT NULL,
+                shell TEXT NOT NULL,
+                arguments_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE history (
+                id TEXT PRIMARY KEY,
+                created_at TEXT NOT NULL,
+                profile_id TEXT,
+                profile_name TEXT NOT NULL,
+                shell TEXT NOT NULL,
+                command TEXT NOT NULL,
+                snapshot_json TEXT NOT NULL,
+                FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE SET NULL
+            );
+            INSERT INTO profiles VALUES (
+                'legacy', '旧配置', 'tool.py', 'python', 'powershell', '[]',
+                '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'
+            );
+            """
+        )
+
+    migrated = Storage(database)
+    assert migrated.get_profile("legacy").invocation_mode == "script"
+    Storage(database)
+    with sqlite3.connect(database) as connection:
+        assert connection.execute(
+            "SELECT value FROM metadata WHERE key = 'schema_version'"
+        ).fetchone()[0] == "2"
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(profiles)")}
+    assert "invocation_mode" in columns
+
+
+def test_imports_v1_backup_as_script(storage: Storage):
+    profile = storage.create_profile(payload())
+    backup_data = storage.export_backup().model_dump(mode="json")
+    backup_data["schema_version"] = 1
+    backup_data["profiles"][0].pop("invocation_mode")
+
+    restored = Storage(storage.database_path.parent / "v1-restored.sqlite3")
+    from command_builder.models import BackupData
+
+    restored.import_backup(BackupData.model_validate(backup_data), ImportMode.REPLACE)
+    assert restored.list_profiles()[0].invocation_mode == "script"

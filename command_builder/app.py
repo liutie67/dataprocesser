@@ -7,15 +7,20 @@ from fastapi import FastAPI, HTTPException, Query, Response, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from .commands import build_command
+from .commands import build_command, parse_command
 from .models import (
     BackupData,
+    CommandDraft,
     GenerateResult,
     HistoryEntry,
     ImportRequest,
     ImportResult,
+    ParseCommandRequest,
+    ParseCommandResult,
+    PreviewResult,
     Profile,
     ProfilePayload,
+    RecordCommandRequest,
 )
 from .storage import Storage
 
@@ -70,6 +75,42 @@ def create_app(database_path: Path | None = None) -> FastAPI:
         if not storage.delete_profile(profile_id):
             raise HTTPException(status_code=404, detail="找不到该配置")
         return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    @application.post("/api/commands/parse", response_model=ParseCommandResult)
+    def parse_existing_command(request: ParseCommandRequest) -> ParseCommandResult:
+        try:
+            return parse_command(request)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @application.post("/api/commands/preview", response_model=PreviewResult)
+    def preview_command(draft: CommandDraft) -> PreviewResult:
+        try:
+            return PreviewResult(command=build_command(draft))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @application.post("/api/commands/record", response_model=GenerateResult)
+    def record_command(request: RecordCommandRequest) -> GenerateResult:
+        try:
+            command = build_command(request.draft)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        profile_id = request.profile_id
+        if profile_id is not None and storage.get_profile(profile_id) is None:
+            profile_id = None
+        snapshot = request.draft.model_dump(mode="json")
+        snapshot["name"] = request.profile_name
+        if profile_id is not None:
+            snapshot["id"] = profile_id
+        history = storage.add_history_snapshot(
+            profile_id=profile_id,
+            profile_name=request.profile_name,
+            shell=request.draft.shell.value,
+            command=command,
+            snapshot=snapshot,
+        )
+        return GenerateResult(command=command, history=history)
 
     @application.post(
         "/api/profiles/{profile_id}/generate", response_model=GenerateResult

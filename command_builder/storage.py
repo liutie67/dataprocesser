@@ -37,18 +37,21 @@ class Storage:
 
     def initialize(self) -> None:
         with self.connect() as connection:
-            connection.executescript(
-                """
+            try:
+                connection.executescript(
+                    """
+                BEGIN IMMEDIATE;
                 CREATE TABLE IF NOT EXISTS metadata (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 );
-                INSERT OR IGNORE INTO metadata(key, value) VALUES ('schema_version', '1');
+                INSERT OR IGNORE INTO metadata(key, value) VALUES ('schema_version', '2');
 
                 CREATE TABLE IF NOT EXISTS profiles (
                     id TEXT PRIMARY KEY,
                     name TEXT NOT NULL COLLATE NOCASE UNIQUE,
                     script_path TEXT NOT NULL,
+                    invocation_mode TEXT NOT NULL DEFAULT 'script',
                     prefix TEXT NOT NULL,
                     shell TEXT NOT NULL,
                     arguments_json TEXT NOT NULL,
@@ -68,9 +71,23 @@ class Storage:
                 );
                 CREATE INDEX IF NOT EXISTS history_created_at_idx ON history(created_at DESC);
                 CREATE INDEX IF NOT EXISTS history_profile_id_idx ON history(profile_id);
-                """
-            )
-            connection.commit()
+                    """
+                )
+                profile_columns = {
+                    row[1] for row in connection.execute("PRAGMA table_info(profiles)")
+                }
+                if "invocation_mode" not in profile_columns:
+                    connection.execute(
+                        "ALTER TABLE profiles ADD COLUMN invocation_mode "
+                        "TEXT NOT NULL DEFAULT 'script'"
+                    )
+                connection.execute(
+                    "UPDATE metadata SET value = '2' WHERE key = 'schema_version'"
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
 
     @staticmethod
     def _profile_from_row(row: sqlite3.Row) -> Profile:
@@ -78,6 +95,7 @@ class Storage:
             id=row["id"],
             name=row["name"],
             script_path=row["script_path"],
+            invocation_mode=row["invocation_mode"],
             prefix=row["prefix"],
             shell=row["shell"],
             arguments=json.loads(row["arguments_json"]),
@@ -118,13 +136,15 @@ class Storage:
             connection.execute(
                 """
                 INSERT INTO profiles(
-                    id, name, script_path, prefix, shell, arguments_json, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    id, name, script_path, invocation_mode, prefix, shell,
+                    arguments_json, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     profile_id,
                     payload.name,
                     payload.script_path,
+                    payload.invocation_mode.value,
                     payload.prefix.value,
                     payload.shell.value,
                     json.dumps(
@@ -143,13 +163,14 @@ class Storage:
             cursor = connection.execute(
                 """
                 UPDATE profiles
-                SET name = ?, script_path = ?, prefix = ?, shell = ?,
+                SET name = ?, script_path = ?, invocation_mode = ?, prefix = ?, shell = ?,
                     arguments_json = ?, updated_at = ?
                 WHERE id = ?
                 """,
                 (
                     payload.name,
                     payload.script_path,
+                    payload.invocation_mode.value,
                     payload.prefix.value,
                     payload.shell.value,
                     json.dumps(
@@ -172,9 +193,25 @@ class Storage:
             return cursor.rowcount > 0
 
     def add_history(self, profile: Profile, command: str) -> HistoryEntry:
+        return self.add_history_snapshot(
+            profile_id=profile.id,
+            profile_name=profile.name,
+            shell=profile.shell.value,
+            command=command,
+            snapshot=profile.model_dump(mode="json"),
+        )
+
+    def add_history_snapshot(
+        self,
+        *,
+        profile_id: str | None,
+        profile_name: str,
+        shell: str,
+        command: str,
+        snapshot: dict[str, Any],
+    ) -> HistoryEntry:
         history_id = str(uuid.uuid4())
         created_at = iso_now()
-        snapshot = profile.model_dump(mode="json")
         with self.connect() as connection:
             connection.execute(
                 """
@@ -185,9 +222,9 @@ class Storage:
                 (
                     history_id,
                     created_at,
-                    profile.id,
-                    profile.name,
-                    profile.shell.value,
+                    profile_id,
+                    profile_name,
+                    shell,
                     command,
                     json.dumps(snapshot, ensure_ascii=False),
                 ),
@@ -234,7 +271,7 @@ class Storage:
 
     def export_backup(self) -> BackupData:
         return BackupData(
-            schema_version=1,
+            schema_version=2,
             exported_at=utc_now(),
             profiles=self.list_profiles(),
             history=self.list_history(limit=1_000_000),
@@ -290,14 +327,15 @@ class Storage:
                     connection.execute(
                         """
                         INSERT INTO profiles(
-                            id, name, script_path, prefix, shell, arguments_json,
-                            created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            id, name, script_path, invocation_mode, prefix, shell,
+                            arguments_json, created_at, updated_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             new_id,
                             name,
                             profile.script_path,
+                            profile.invocation_mode.value,
                             profile.prefix.value,
                             profile.shell.value,
                             json.dumps(
@@ -316,6 +354,7 @@ class Storage:
                     used_history_ids.add(new_id)
                     profile_id = profile_id_map.get(item.profile_id or "")
                     snapshot: dict[str, Any] = dict(item.snapshot)
+                    snapshot.setdefault("invocation_mode", "script")
                     if item.profile_id in profile_id_map:
                         snapshot["id"] = profile_id_map[item.profile_id]
                         snapshot["name"] = profile_name_map[item.profile_id]

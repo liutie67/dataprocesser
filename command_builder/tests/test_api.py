@@ -39,7 +39,7 @@ def test_profile_generate_history_and_exports(tmp_path: Path):
 
         json_export = client.get("/api/export/json")
         assert json_export.status_code == 200
-        assert json_export.json()["schema_version"] == 1
+        assert json_export.json()["schema_version"] == 2
         assert "attachment" in json_export.headers["content-disposition"]
 
         txt_export = client.get("/api/export/txt")
@@ -96,3 +96,78 @@ def test_rejects_duplicate_name_and_invalid_parameter(tmp_path: Path):
             }
         ]
         assert client.post("/api/profiles", json=payload).status_code == 422
+
+
+def test_parse_and_preview_do_not_write_data(tmp_path: Path):
+    with TestClient(create_app(tmp_path / "parse.sqlite3")) as client:
+        parsed = client.post(
+            "/api/commands/parse",
+            json={
+                "command": "py -m package.worker --limit 12 --verbose",
+                "dialect": "auto",
+                "fallback_shell": "powershell",
+            },
+        )
+        assert parsed.status_code == 200
+        draft = parsed.json()["draft"]
+        assert draft["invocation_mode"] == "module"
+        assert draft["prefix"] == "py"
+
+        preview = client.post("/api/commands/preview", json=draft)
+        assert preview.status_code == 200
+        assert preview.json()["command"] == "py -m package.worker --limit 12 --verbose"
+        assert client.get("/api/profiles").json() == []
+        assert client.get("/api/history").json() == []
+
+
+def test_parse_error_leaves_api_data_untouched(tmp_path: Path):
+    with TestClient(create_app(tmp_path / "parse-error.sqlite3")) as client:
+        response = client.post(
+            "/api/commands/parse",
+            json={"command": "python -c 'print(1)'", "dialect": "bash"},
+        )
+        assert response.status_code == 422
+        assert "-c" in response.json()["detail"]
+        assert client.get("/api/profiles").json() == []
+
+
+def test_record_draft_history_without_saving_profile(tmp_path: Path):
+    with TestClient(create_app(tmp_path / "record.sqlite3")) as client:
+        draft = {
+            "script_path": "tool.py",
+            "invocation_mode": "script",
+            "prefix": "python",
+            "shell": "powershell",
+            "arguments": [],
+        }
+        recorded = client.post(
+            "/api/commands/record",
+            json={"profile_id": None, "profile_name": "未保存配置", "draft": draft},
+        )
+        assert recorded.status_code == 200
+        assert recorded.json()["command"] == "python tool.py"
+        assert recorded.json()["history"]["profile_id"] is None
+        assert recorded.json()["history"]["snapshot"]["name"] == "未保存配置"
+        assert client.get("/api/profiles").json() == []
+        assert len(client.get("/api/history").json()) == 1
+
+
+def test_record_draft_keeps_valid_profile_link(tmp_path: Path):
+    with TestClient(create_app(tmp_path / "record-linked.sqlite3")) as client:
+        payload = {
+            "name": "已保存",
+            "script_path": "tool.py",
+            "prefix": "python",
+            "shell": "powershell",
+            "arguments": [],
+        }
+        profile = client.post("/api/profiles", json=payload).json()
+        draft = {key: value for key, value in profile.items() if key in {
+            "script_path", "invocation_mode", "prefix", "shell", "arguments"
+        }}
+        recorded = client.post(
+            "/api/commands/record",
+            json={"profile_id": profile["id"], "profile_name": "已保存", "draft": draft},
+        )
+        assert recorded.status_code == 200
+        assert recorded.json()["history"]["profile_id"] == profile["id"]

@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 class CommandPrefix(StrEnum):
     PYTHON = "python"
+    PY = "py"
     UV_RUN_PYTHON = "uv_run_python"
 
 
@@ -16,6 +17,18 @@ class ShellTarget(StrEnum):
     POWERSHELL = "powershell"
     CMD = "cmd"
     BASH = "bash"
+
+
+class ShellDialect(StrEnum):
+    AUTO = "auto"
+    POWERSHELL = "powershell"
+    CMD = "cmd"
+    BASH = "bash"
+
+
+class InvocationMode(StrEnum):
+    SCRIPT = "script"
+    MODULE = "module"
 
 
 class ArgumentMode(StrEnum):
@@ -72,18 +85,30 @@ class CommandArgument(BaseModel):
         return self
 
 
-class ProfilePayload(BaseModel):
+class CommandDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(min_length=1, max_length=120)
     script_path: str = Field(min_length=1, max_length=4096)
+    invocation_mode: InvocationMode = InvocationMode.SCRIPT
     prefix: CommandPrefix = CommandPrefix.PYTHON
     shell: ShellTarget = ShellTarget.POWERSHELL
     arguments: list[CommandArgument] = Field(default_factory=list, max_length=200)
 
-    @field_validator("name", "script_path")
+    @field_validator("script_path")
     @classmethod
     def strip_required_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("该字段不能为空")
+        return normalized
+
+
+class ProfilePayload(CommandDraft):
+    name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
         normalized = value.strip()
         if not normalized:
             raise ValueError("该字段不能为空")
@@ -111,6 +136,48 @@ class GenerateResult(BaseModel):
     history: HistoryEntry
 
 
+class PreviewResult(BaseModel):
+    command: str
+
+
+class RecordCommandRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    profile_id: str | None = Field(default=None, max_length=64)
+    profile_name: str = Field(min_length=1, max_length=120)
+    draft: CommandDraft
+
+    @field_validator("profile_name")
+    @classmethod
+    def strip_profile_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("配置名称不能为空")
+        return normalized
+
+
+class ParseCommandRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command: str = Field(min_length=1, max_length=32768)
+    dialect: ShellDialect = ShellDialect.AUTO
+    fallback_shell: ShellTarget = ShellTarget.POWERSHELL
+
+    @field_validator("command")
+    @classmethod
+    def strip_command(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("命令不能为空")
+        return normalized
+
+
+class ParseCommandResult(BaseModel):
+    draft: CommandDraft
+    detected_shell: ShellTarget
+    warnings: list[str] = Field(default_factory=list)
+
+
 class BackupData(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -122,8 +189,8 @@ class BackupData(BaseModel):
     @field_validator("schema_version")
     @classmethod
     def supported_schema(cls, value: int) -> int:
-        if value != 1:
-            raise ValueError("仅支持 schema_version 1")
+        if value not in {1, 2}:
+            raise ValueError("仅支持 schema_version 1 或 2")
         return value
 
     @model_validator(mode="after")

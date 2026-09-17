@@ -12,122 +12,124 @@
     <div>
       <p class="eyebrow">LOCAL COMMAND WORKBENCH</p>
       <h1>Python 命令生成器</h1>
-      <p class="subtitle">配置参数、生成命令、保留每一次快照。所有数据只在本机。</p>
+      <p class="subtitle">粘贴、拆分、调整并重建命令。所有数据只在本机处理。</p>
     </div>
     <div class="local-badge"><span></span> 仅监听 127.0.0.1</div>
   </header>
 
-  <main class="layout">
-    <aside class="panel profile-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="section-kicker">配置</p>
-          <h2>命令块</h2>
+  <main id="main-layout" class="layout">
+    <aside id="profile-panel" class="panel profile-panel">
+      <button id="toggle-left" class="sidebar-toggle" type="button" aria-expanded="true" title="折叠配置栏">‹</button>
+      <div class="sidebar-content">
+        <div class="panel-heading">
+          <div><p class="section-kicker">配置</p><h2>命令块</h2></div>
+          <button id="new-profile" class="icon-button" type="button" title="新建配置">＋</button>
         </div>
-        <button id="new-profile" class="icon-button" title="新建配置">＋</button>
-      </div>
-      <div id="profile-list" class="profile-list"></div>
-      <div class="profile-actions">
-        <button id="duplicate-profile" class="button secondary">复制当前配置</button>
-        <button id="delete-profile" class="button danger-quiet">删除</button>
-      </div>
-
-      <div class="transfer-box">
-        <p class="section-kicker">备份与迁移</p>
-        <div class="button-row">
-          <a class="button secondary" href="/api/export/json" download>导出 JSON</a>
-          <a class="button secondary" href="/api/export/txt" download>导出 TXT</a>
+        <div id="profile-list" class="profile-list"></div>
+        <div class="profile-actions">
+          <button id="duplicate-profile" class="button secondary" type="button">复制当前配置</button>
+          <button id="delete-profile" class="button danger-quiet" type="button">删除</button>
         </div>
-        <label class="field-label" for="import-mode">JSON 导入方式</label>
-        <select id="import-mode">
-          <option value="merge">合并到现有数据</option>
-          <option value="replace">全部替换</option>
-        </select>
-        <label class="file-button">
-          选择 JSON 备份
-          <input id="import-file" type="file" accept="application/json,.json">
-        </label>
+        <div class="transfer-box">
+          <p class="section-kicker">备份与迁移</p>
+          <div class="button-row">
+            <a class="button secondary" href="/api/export/json" download>导出 JSON</a>
+            <a class="button secondary" href="/api/export/txt" download>导出 TXT</a>
+          </div>
+          <label class="field-label" for="import-mode">JSON 导入方式</label>
+          <select id="import-mode"><option value="merge">合并到现有数据</option><option value="replace">全部替换</option></select>
+          <label class="file-button">选择 JSON 备份<input id="import-file" type="file" accept="application/json,.json"></label>
+        </div>
       </div>
+      <span class="collapsed-label" aria-hidden="true">配置</span>
     </aside>
 
     <section class="workspace">
       <div class="panel editor-panel">
         <div class="panel-heading editor-heading">
-          <div>
-            <p class="section-kicker">编辑器</p>
-            <h2>组装命令</h2>
-          </div>
+          <div><p class="section-kicker">编辑器</p><h2>组装命令</h2></div>
           <span id="save-state" class="save-state">尚未保存</span>
         </div>
 
+        <section class="parser-box" aria-labelledby="parser-heading">
+          <div class="parser-heading">
+            <div><p class="section-kicker">快速导入</p><h3 id="parser-heading">粘贴现有命令</h3></div>
+            <div class="parser-links">
+              <button id="load-example" class="text-button accent" type="button">加载示例</button>
+              <button id="clear-command-input" class="text-button" type="button">清空</button>
+            </div>
+          </div>
+          <textarea id="command-input" rows="3" spellcheck="false" placeholder="例如：uv run python testbench.py --budget 20 --verbose"></textarea>
+          <div class="parser-actions">
+            <label class="dialect-field"><span>输入终端</span><select id="dialect-select"><option value="auto">自动识别</option><option value="powershell">PowerShell</option><option value="cmd">cmd</option><option value="bash">Bash</option></select></label>
+            <div class="parser-buttons">
+              <button id="undo-parse" class="button secondary hidden" type="button">撤销解析</button>
+              <button id="parse-command" class="button primary" type="button">解析并填入</button>
+            </div>
+          </div>
+          <p id="parse-status" class="inline-status" role="status" aria-live="polite"></p>
+        </section>
+
         <div class="profile-fields">
-          <label>
-            <span>配置名称</span>
-            <input id="profile-name" maxlength="120" placeholder="例如：模型评测">
-          </label>
-          <label class="wide-field">
-            <span>Python 文件路径</span>
-            <input id="script-path" maxlength="4096" placeholder="例如：.\testbench.py 或 C:\项目\testbench.py">
-          </label>
-          <label>
-            <span>运行前缀</span>
-            <select id="prefix">
-              <option value="python">python</option>
-              <option value="uv_run_python">uv run python</option>
-            </select>
-          </label>
-          <label>
-            <span>目标终端</span>
-            <select id="shell">
-              <option value="powershell">PowerShell</option>
-              <option value="cmd">cmd</option>
-              <option value="bash">Bash</option>
-            </select>
-          </label>
+          <label><span>配置名称</span><input id="profile-name" maxlength="120" placeholder="例如：模型评测"></label>
+          <label><span>调用方式</span><select id="invocation-mode"><option value="script">脚本文件</option><option value="module">Python 模块（-m）</option></select></label>
+          <label class="wide-field"><span id="script-path-label">Python 文件路径</span><input id="script-path" maxlength="4096" placeholder="例如：.\testbench.py 或 C:\项目\testbench.py"></label>
+          <label><span>运行前缀</span><select id="prefix"><option value="python">python</option><option value="py">py</option><option value="uv_run_python">uv run python</option></select></label>
+          <label><span>目标终端</span><select id="shell"><option value="powershell">PowerShell</option><option value="cmd">cmd</option><option value="bash">Bash</option></select></label>
         </div>
 
         <div class="argument-heading">
-          <div>
-            <p class="section-kicker">参数</p>
-            <h3>按顺序拼接</h3>
-          </div>
-          <button id="add-argument" class="button secondary">＋ 添加参数</button>
+          <div><p class="section-kicker">参数</p><h3>按顺序拼接</h3></div>
+          <button id="add-argument" class="button secondary" type="button">＋ 添加参数</button>
         </div>
+        <div class="argument-column-labels" aria-hidden="true"><span></span><span></span><span>模式</span><span>类型</span><span>参数标记</span><span>当前值</span><span></span></div>
         <div id="argument-list" class="argument-list"></div>
 
         <div class="editor-actions">
-          <button id="save-profile" class="button secondary large">保存配置</button>
-          <button id="generate-command" class="button primary large">生成命令</button>
+          <span class="shortcut-hint">Ctrl+S 保存 · Ctrl+Enter 复制并记录</span>
+          <div>
+            <button id="save-profile" class="button secondary large" type="button">保存配置</button>
+          </div>
         </div>
       </div>
 
       <div class="panel result-panel">
         <div class="result-heading">
-          <div>
-            <p class="section-kicker">生成结果</p>
-            <h2>可直接粘贴到终端</h2>
-          </div>
-          <button id="copy-result" class="button secondary" disabled>复制命令</button>
+          <div><p class="section-kicker">实时预览</p><h2>可直接粘贴到终端</h2></div>
+          <button id="copy-result" class="button secondary" type="button" disabled>复制命令</button>
         </div>
-        <pre id="command-result" class="command-result"><code>配置完成后点击“生成命令”</code></pre>
+        <pre id="command-result" class="command-result"><code>填写脚本路径或模块名后将自动生成</code></pre>
+        <p id="preview-error" class="preview-error" role="status" aria-live="polite"></p>
       </div>
     </section>
 
-    <aside class="panel history-panel">
-      <div class="panel-heading">
-        <div>
-          <p class="section-kicker">历史</p>
-          <h2>生成记录</h2>
+    <aside id="history-panel" class="panel history-panel">
+      <div id="history-resizer" class="history-resizer" role="separator" aria-label="调整历史栏宽度" aria-orientation="vertical" aria-valuemin="260" aria-valuemax="720" aria-valuenow="280" tabindex="0" title="向左拖动可拉宽历史栏；双击恢复默认宽度"></div>
+      <button id="toggle-right" class="sidebar-toggle" type="button" aria-expanded="false" title="展开历史栏">‹</button>
+      <div class="sidebar-content">
+        <div class="panel-heading">
+          <div><p class="section-kicker">历史</p><h2>生成记录</h2></div>
+          <button id="clear-history" class="text-button" type="button">清空</button>
         </div>
-        <button id="clear-history" class="text-button">清空</button>
+        <label class="search-box"><span>⌕</span><input id="history-search" placeholder="搜索名称或命令"></label>
+        <div id="history-list" class="history-list"></div>
       </div>
-      <label class="search-box">
-        <span>⌕</span>
-        <input id="history-search" placeholder="搜索名称或命令">
-      </label>
-      <div id="history-list" class="history-list"></div>
+      <span class="collapsed-label" aria-hidden="true">历史</span>
     </aside>
   </main>
+
+  <dialog id="name-conflict-dialog" class="conflict-dialog">
+    <form method="dialog">
+      <p class="section-kicker">名称冲突</p>
+      <h2 id="name-conflict-title">已有同名配置</h2>
+      <p id="name-conflict-message" class="dialog-message"></p>
+      <div class="dialog-actions">
+        <button id="overwrite-profile" class="button danger-quiet" value="overwrite">覆盖同名配置</button>
+        <button class="button primary" value="suffix">自动添加数字后缀</button>
+        <button class="button secondary" value="cancel">取消</button>
+      </div>
+    </form>
+  </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="/static/app.js" defer></script>
