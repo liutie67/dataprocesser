@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Python 命令生成器</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23186b4f'/%3E%3Cpath d='M18 21l11 11-11 11M34 43h13' fill='none' stroke='white' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">LOCAL COMMAND WORKBENCH</p>
+      <h1>Python 命令生成器</h1>
+      <p class="subtitle">配置参数、生成命令、保留每一次快照。所有数据只在本机。</p>
+    </div>
+    <div class="local-badge"><span></span> 仅监听 127.0.0.1</div>
+  </header>
+
+  <main class="layout">
+    <aside class="panel profile-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="section-kicker">配置</p>
+          <h2>命令块</h2>
+        </div>
+        <button id="new-profile" class="icon-button" title="新建配置">＋</button>
+      </div>
+      <div id="profile-list" class="profile-list"></div>
+      <div class="profile-actions">
+        <button id="duplicate-profile" class="button secondary">复制当前配置</button>
+        <button id="delete-profile" class="button danger-quiet">删除</button>
+      </div>
+
+      <div class="transfer-box">
+        <p class="section-kicker">备份与迁移</p>
+        <div class="button-row">
+          <a class="button secondary" href="/api/export/json" download>导出 JSON</a>
+          <a class="button secondary" href="/api/export/txt" download>导出 TXT</a>
+        </div>
+        <label class="field-label" for="import-mode">JSON 导入方式</label>
+        <select id="import-mode">
+          <option value="merge">合并到现有数据</option>
+          <option value="replace">全部替换</option>
+        </select>
+        <label class="file-button">
+          选择 JSON 备份
+          <input id="import-file" type="file" accept="application/json,.json">
+        </label>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <div class="panel editor-panel">
+        <div class="panel-heading editor-heading">
+          <div>
+            <p class="section-kicker">编辑器</p>
+            <h2>组装命令</h2>
+          </div>
+          <span id="save-state" class="save-state">尚未保存</span>
+        </div>
+
+        <div class="profile-fields">
+          <label>
+            <span>配置名称</span>
+            <input id="profile-name" maxlength="120" placeholder="例如：模型评测">
+          </label>
+          <label class="wide-field">
+            <span>Python 文件路径</span>
+            <input id="script-path" maxlength="4096" placeholder="例如：.\testbench.py 或 C:\项目\testbench.py">
+          </label>
+          <label>
+            <span>运行前缀</span>
+            <select id="prefix">
+              <option value="python">python</option>
+              <option value="uv_run_python">uv run python</option>
+            </select>
+          </label>
+          <label>
+            <span>目标终端</span>
+            <select id="shell">
+              <option value="powershell">PowerShell</option>
+              <option value="cmd">cmd</option>
+              <option value="bash">Bash</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="argument-heading">
+          <div>
+            <p class="section-kicker">参数</p>
+            <h3>按顺序拼接</h3>
+          </div>
+          <button id="add-argument" class="button secondary">＋ 添加参数</button>
+        </div>
+        <div id="argument-list" class="argument-list"></div>
+
+        <div class="editor-actions">
+          <button id="save-profile" class="button secondary large">保存配置</button>
+          <button id="generate-command" class="button primary large">生成命令</button>
+        </div>
+      </div>
+
+      <div class="panel result-panel">
+        <div class="result-heading">
+          <div>
+            <p class="section-kicker">生成结果</p>
+            <h2>可直接粘贴到终端</h2>
+          </div>
+          <button id="copy-result" class="button secondary" disabled>复制命令</button>
+        </div>
+        <pre id="command-result" class="command-result"><code>配置完成后点击“生成命令”</code></pre>
+      </div>
+    </section>
+
+    <aside class="panel history-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="section-kicker">历史</p>
+          <h2>生成记录</h2>
+        </div>
+        <button id="clear-history" class="text-button">清空</button>
+      </div>
+      <label class="search-box">
+        <span>⌕</span>
+        <input id="history-search" placeholder="搜索名称或命令">
+      </label>
+      <div id="history-list" class="history-list"></div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

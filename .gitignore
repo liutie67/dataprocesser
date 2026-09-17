@@ -1,6 +1,7 @@
 .idea/
 .DS_Store
 __pycache__
+/.pytest_cache/
 
 /singers/videos
 /singers/audios
@@ -21,5 +22,8 @@ yolo_process/database
 local_launchpad.py
 
 atest*
+
+# Local command builder runtime data
+/command_builder/data/
 
 
