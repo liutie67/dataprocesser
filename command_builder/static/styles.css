@@ -330,6 +330,12 @@ input:focus, select:focus, textarea:focus {
 .drag-handle:active { cursor: grabbing; }
 .check-label { display: flex !important; align-items: center; justify-content: center; }
 .check-label input { width: 16px; height: 16px; }
+.value-slot:has(.arg-value[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+}
+.arg-value[type="checkbox"] { width: 16px; height: 16px; }
 .argument-tools { display: flex; justify-content: flex-end; gap: 4px; }
 .mini-button { width: 29px; height: 30px; padding: 0; border: 1px solid var(--line); background: white; }
 .mini-button.delete { color: var(--danger); }

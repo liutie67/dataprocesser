@@ -180,6 +180,7 @@ function renderValueControl(card, value) {
     control = document.createElement("input");
     control.type = "checkbox";
     control.checked = value === true || value === "true";
+    control.title = "勾选后在命令中加入此开关，取消勾选后移除";
   } else if (type === "choice") {
     control = document.createElement("select");
     const choices = splitChoices(card.querySelector(".arg-choices").value);
@@ -198,7 +199,7 @@ function renderValueControl(card, value) {
     control.value = value ?? "";
   }
   control.className = "arg-value";
-  control.setAttribute("aria-label", "当前值");
+  control.setAttribute("aria-label", type === "bool" ? "是否加入此布尔开关" : "当前值");
   control.addEventListener("input", () => { validateArgumentCard(card); markDirty(); });
   control.addEventListener("change", () => { validateArgumentCard(card); markDirty(); });
   slot.append(control);
@@ -230,7 +231,6 @@ function updateArgumentCard(card) {
   card.classList.toggle("disabled", !enabled);
   card.querySelector(".token-field").classList.toggle("hidden", mode === "positional");
   card.querySelector(".choices-field").classList.toggle("hidden", type !== "choice");
-  card.querySelector(".value-field").classList.toggle("hidden", type === "bool");
   [...card.querySelector(".arg-type").options].forEach((option) => {
     if (option.value === "bool") option.disabled = mode === "positional";
   });
@@ -291,7 +291,11 @@ function addArgumentCard(argument) {
     markDirty();
   });
   card.querySelector(".arg-type").addEventListener("change", () => {
-    renderValueControl(card, "");
+    const type = card.querySelector(".arg-type").value;
+    // Selecting a bool type represents adding a command-line switch. Start it
+    // enabled so the preview changes immediately; the visible checkbox then
+    // controls whether the switch is included.
+    renderValueControl(card, type === "bool" ? true : "");
     updateArgumentCard(card);
     markDirty();
   });
