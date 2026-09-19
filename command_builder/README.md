@@ -4,7 +4,7 @@
 
 ## 主要功能
 
-- 粘贴 `python`、`py` 或 `uv run python` 命令，自动拆分脚本/模块和参数。
+- 粘贴单行或多行的 `python`、`py`、`uv run python` 命令，自动拆分脚本/模块和参数；支持 PowerShell 反引号、cmd `^`、Bash 反斜杠续行。
 - 支持脚本调用与 `python -m package` 模块调用。
 - 支持 PowerShell、cmd、Bash 的解析、引用和输出。
 - 参数可编辑、启停、拖拽排序，并实时预览重建后的命令。

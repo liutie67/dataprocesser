@@ -59,7 +59,7 @@
               <button id="clear-command-input" class="text-button" type="button">清空</button>
             </div>
           </div>
-          <textarea id="command-input" rows="3" spellcheck="false" placeholder="例如：uv run python testbench.py --budget 20 --verbose"></textarea>
+          <textarea id="command-input" rows="5" spellcheck="false" placeholder="支持粘贴单行命令，或使用反引号续行的 PowerShell 多行命令"></textarea>
           <div class="parser-actions">
             <label class="dialect-field"><span>输入终端</span><select id="dialect-select"><option value="auto">自动识别</option><option value="powershell">PowerShell</option><option value="cmd">cmd</option><option value="bash">Bash</option></select></label>
             <div class="parser-buttons">

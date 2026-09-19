@@ -114,6 +114,80 @@ _FLOAT = re.compile(
 _NEGATIVE_NUMBER = re.compile(r"^-\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$")
 
 
+def _normalize_multiline(command: str, dialect: ShellTarget) -> str:
+    """Fold shell line continuations while leaving quoted newlines intact."""
+    marker = {
+        ShellTarget.POWERSHELL: "`",
+        ShellTarget.CMD: "^",
+        ShellTarget.BASH: "\\",
+    }[dialect]
+    normalized: list[str] = []
+    quote: str | None = None
+    index = 0
+
+    while index < len(command):
+        char = command[index]
+
+        marker_is_active = (
+            char == marker
+            and not (
+                dialect in {ShellTarget.POWERSHELL, ShellTarget.BASH}
+                and quote == "'"
+            )
+            and not (dialect == ShellTarget.CMD and quote == '"')
+        )
+        if marker_is_active:
+            newline_index = index + 1
+            if dialect in {ShellTarget.POWERSHELL, ShellTarget.CMD} and quote is None:
+                while (
+                    newline_index < len(command)
+                    and command[newline_index] in " \t"
+                ):
+                    newline_index += 1
+            if (
+                newline_index < len(command)
+                and command[newline_index] in "\r\n"
+            ):
+                if (
+                    command[newline_index] == "\r"
+                    and newline_index + 1 < len(command)
+                    and command[newline_index + 1] == "\n"
+                ):
+                    newline_index += 1
+                normalized.append(" ")
+                index = newline_index + 1
+                continue
+
+            # Escaped quotes must not change the quote state used by this scanner.
+            if index + 1 < len(command):
+                normalized.extend((char, command[index + 1]))
+                index += 2
+                continue
+
+        if char in {"'", '"'} and (dialect != ShellTarget.CMD or char == '"'):
+            if quote is None:
+                quote = char
+            elif quote == char:
+                if (
+                    dialect == ShellTarget.POWERSHELL
+                    and quote == "'"
+                    and index + 1 < len(command)
+                    and command[index + 1] == "'"
+                ):
+                    normalized.extend(("'", "'"))
+                    index += 2
+                    continue
+                quote = None
+            normalized.append(char)
+            index += 1
+            continue
+
+        normalized.append(char)
+        index += 1
+
+    return "".join(normalized)
+
+
 def _find_unsupported_operator(command: str, dialect: ShellTarget) -> str | None:
     quote: str | None = None
     index = 0
@@ -203,11 +277,10 @@ def _split_windows(command: str, dialect: ShellTarget) -> list[str]:
 
 
 def _tokenize(command: str, shell: ShellTarget) -> list[str]:
+    command = _normalize_multiline(command, shell)
     operator = _find_unsupported_operator(command, shell)
     if operator:
         raise ValueError(f"暂不支持包含 {operator} 的多命令、管道或重定向")
-    if "\n" in command or "\r" in command:
-        raise ValueError("仅支持单行命令")
     if shell == ShellTarget.BASH:
         if "$(" in command or "`" in command:
             raise ValueError("暂不支持 Bash 命令替换")
@@ -219,11 +292,16 @@ def _tokenize(command: str, shell: ShellTarget) -> list[str]:
 
 
 def _detect_shell(command: str, fallback: ShellTarget) -> tuple[ShellTarget, list[str]]:
-    if re.search(r"%[^%\s]+%|(?:^|\s)\^", command):
+    newline = r"(?:\r\n|\r|\n)"
+    if re.search(rf"%[^%\s]+%|(?:^|\s)\^|\^[ \t]*{newline}", command):
         return ShellTarget.CMD, []
-    if re.search(r"\$env:|`[^`]", command, re.IGNORECASE):
+    if re.search(rf"\$env:|`[^`]|`[ \t]*{newline}", command, re.IGNORECASE):
         return ShellTarget.POWERSHELL, []
-    if re.search(r"\$[A-Za-z_{]|(?:^|\s)(?:\./|/usr/|~/)", command) or "'" in command:
+    if (
+        re.search(r"\$[A-Za-z_{]|(?:^|\s)(?:\./|/usr/|~/)", command)
+        or re.search(rf"\\{newline}", command)
+        or "'" in command
+    ):
         return ShellTarget.BASH, []
     return fallback, [f"未发现明确的终端语法，已按 {fallback.value} 解析。"]
 

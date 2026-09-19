@@ -139,6 +139,98 @@ def test_parse_uv_script_with_named_positionals_and_separator():
     assert parsed.draft.arguments[-1].value == "--literal"
 
 
+def test_parse_powershell_multiline_command_with_continuations():
+    command = """uv run python testbench.py `
+  --input "data/converted/network.xlsx" `
+  --out "data/all_parameters" `
+  --network-model both `
+  --missing-turns-policy error `
+  --weight auto `
+  --budget 20 `
+  --detour-ratio 0.10 `
+  --od-limit 200 `
+  --mc 100 `
+  --worst-od-limit 5 `
+  --seed 0 `
+  --greedy `
+  --greedy-analysis `
+  --mode-curves `
+  --compare-turn-policies `
+  --reduce-full `
+  --no-plots `
+  --estimate-only `
+  --max-estimated-minutes 60 `
+  --force-run `
+  --timestamp-output"""
+
+    parsed = parse_command(ParseCommandRequest(command=command, dialect="auto"))
+
+    assert parsed.detected_shell == "powershell"
+    assert parsed.draft.prefix == "uv_run_python"
+    assert parsed.draft.script_path == "testbench.py"
+    values = {item.token: item.value for item in parsed.draft.arguments}
+    assert values == {
+        "--input": "data/converted/network.xlsx",
+        "--out": "data/all_parameters",
+        "--network-model": "both",
+        "--missing-turns-policy": "error",
+        "--weight": "auto",
+        "--budget": 20,
+        "--detour-ratio": 0.1,
+        "--od-limit": 200,
+        "--mc": 100,
+        "--worst-od-limit": 5,
+        "--seed": 0,
+        "--greedy": True,
+        "--greedy-analysis": True,
+        "--mode-curves": True,
+        "--compare-turn-policies": True,
+        "--reduce-full": True,
+        "--no-plots": True,
+        "--estimate-only": True,
+        "--max-estimated-minutes": 60,
+        "--force-run": True,
+        "--timestamp-output": True,
+    }
+
+
+@pytest.mark.parametrize(
+    ("dialect", "command"),
+    [
+        ("powershell", "python tool.py `  \r\n  --limit 2"),
+        ("cmd", "python tool.py ^\r\n  --limit 2"),
+        ("bash", "python tool.py \\\n  --limit 2"),
+        ("powershell", "python tool.py\n  --limit 2"),
+    ],
+)
+def test_parse_multiline_variants(dialect, command):
+    parsed = parse_command(ParseCommandRequest(command=command, dialect=dialect))
+    assert parsed.draft.arguments[0].token == "--limit"
+    assert parsed.draft.arguments[0].value == 2
+
+
+def test_multiline_quoted_value_is_preserved():
+    parsed = parse_command(
+        ParseCommandRequest(
+            command='python tool.py --label "first\nsecond"\n--verbose',
+            dialect="powershell",
+        )
+    )
+    assert parsed.draft.arguments[0].value == "first\nsecond"
+    assert parsed.draft.arguments[1].value is True
+
+
+def test_powershell_escaped_quote_does_not_break_multiline_scanning():
+    parsed = parse_command(
+        ParseCommandRequest(
+            command='python tool.py --label "say `"hello`"" `\n--verbose',
+            dialect="powershell",
+        )
+    )
+    assert parsed.draft.arguments[0].value == 'say "hello"'
+    assert parsed.draft.arguments[1].value is True
+
+
 def test_parse_module_equals_repeated_flags_and_negative_number():
     parsed = parse_command(
         ParseCommandRequest(
