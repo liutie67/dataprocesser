@@ -194,6 +194,9 @@ function renderValueControl(card, value) {
   } else {
     control = document.createElement("input");
     control.type = type === "int" || type === "float" ? "number" : "text";
+    if (control.type === "number") {
+      control.addEventListener("wheel", (event) => event.preventDefault(), { passive: false });
+    }
     if (type === "float") control.step = "any";
     control.placeholder = type === "path" ? "路径或文件名" : "参数值";
     control.value = value ?? "";
