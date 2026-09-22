@@ -367,8 +367,35 @@ input:focus, select:focus, textarea:focus {
 .search-box span { position: absolute; left: 9px; top: 7px; font-size: 16px; color: var(--muted); }
 .search-box input { padding-left: 29px; }
 .history-item { padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: #fbfaf5; }
-.history-meta { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; }
-.history-meta strong { color: var(--ink); font-size: 11px; }
+.history-meta {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(64px, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.history-meta strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.history-meta time { white-space: nowrap; }
+.history-note {
+  min-width: 0;
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: white;
+  color: var(--ink);
+  font-size: 10px;
+}
+.history-note::placeholder { color: #9b9f98; }
+.history-note.saving { border-color: #8ab5a4; background: #f3faf6; }
+.history-note.save-error { border-color: var(--danger); background: #fff5f3; }
 .history-command {
   margin: 7px 0;
   padding: 8px;

@@ -66,6 +66,7 @@ class Storage:
                     profile_name TEXT NOT NULL,
                     shell TEXT NOT NULL,
                     command TEXT NOT NULL,
+                    note TEXT NOT NULL DEFAULT '',
                     snapshot_json TEXT NOT NULL,
                     FOREIGN KEY(profile_id) REFERENCES profiles(id) ON DELETE SET NULL
                 );
@@ -80,6 +81,13 @@ class Storage:
                     connection.execute(
                         "ALTER TABLE profiles ADD COLUMN invocation_mode "
                         "TEXT NOT NULL DEFAULT 'script'"
+                    )
+                history_columns = {
+                    row[1] for row in connection.execute("PRAGMA table_info(history)")
+                }
+                if "note" not in history_columns:
+                    connection.execute(
+                        "ALTER TABLE history ADD COLUMN note TEXT NOT NULL DEFAULT ''"
                     )
                 connection.execute(
                     "UPDATE metadata SET value = '2' WHERE key = 'schema_version'"
@@ -112,6 +120,7 @@ class Storage:
             profile_name=row["profile_name"],
             shell=row["shell"],
             command=row["command"],
+            note=row["note"],
             snapshot=json.loads(row["snapshot_json"]),
         )
 
@@ -246,16 +255,26 @@ class Storage:
                 rows = connection.execute(
                     """
                     SELECT * FROM history
-                    WHERE profile_name LIKE ? OR command LIKE ?
+                    WHERE profile_name LIKE ? OR command LIKE ? OR note LIKE ?
                     ORDER BY created_at DESC LIMIT ?
                     """,
-                    (pattern, pattern, limit),
+                    (pattern, pattern, pattern, limit),
                 ).fetchall()
             else:
                 rows = connection.execute(
                     "SELECT * FROM history ORDER BY created_at DESC LIMIT ?", (limit,)
                 ).fetchall()
         return [self._history_from_row(row) for row in rows]
+
+    def update_history_note(self, history_id: str, note: str) -> HistoryEntry | None:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE history SET note = ? WHERE id = ?", (note, history_id)
+            )
+            connection.commit()
+            if cursor.rowcount == 0:
+                return None
+        return self.get_history(history_id)
 
     def delete_history(self, history_id: str) -> bool:
         with self.connect() as connection:
@@ -365,8 +384,8 @@ class Storage:
                         """
                         INSERT INTO history(
                             id, created_at, profile_id, profile_name, shell,
-                            command, snapshot_json
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                            command, note, snapshot_json
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             new_id,
@@ -375,6 +394,7 @@ class Storage:
                             profile_name,
                             item.shell.value,
                             item.command,
+                            item.note,
                             json.dumps(snapshot, ensure_ascii=False),
                         ),
                     )

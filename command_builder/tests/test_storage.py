@@ -47,7 +47,12 @@ def test_profile_crud_and_history(storage: Storage):
     command = build_command(updated)
     history = storage.add_history(updated, command)
     assert history.profile_id == updated.id
+    assert history.note == ""
+    history = storage.update_history_note(history.id, "高并发参数")
+    assert history is not None
+    assert history.note == "高并发参数"
     assert storage.list_history(query="budget")[0].id == history.id
+    assert storage.list_history(query="高并发")[0].id == history.id
 
     assert storage.delete_profile(updated.id)
     retained = storage.get_history(history.id)
@@ -58,7 +63,8 @@ def test_profile_crud_and_history(storage: Storage):
 
 def test_export_and_replace_round_trip(storage: Storage, tmp_path: Path):
     profile = storage.create_profile(payload())
-    storage.add_history(profile, build_command(profile))
+    history = storage.add_history(profile, build_command(profile))
+    storage.update_history_note(history.id, "基准测试")
     backup = storage.export_backup()
 
     restored = Storage(tmp_path / "restored.sqlite3")
@@ -67,6 +73,7 @@ def test_export_and_replace_round_trip(storage: Storage, tmp_path: Path):
     assert result.history_imported == 1
     assert restored.list_profiles()[0].model_dump() == profile.model_dump()
     assert restored.list_history()[0].command == r"python .\testbench.py --budget 120"
+    assert restored.list_history()[0].note == "基准测试"
 
 
 def test_merge_renames_conflicting_profile(storage: Storage):
@@ -122,28 +129,40 @@ def test_migrates_v1_database_idempotently(tmp_path: Path):
                 'legacy', '旧配置', 'tool.py', 'python', 'powershell', '[]',
                 '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00'
             );
+            INSERT INTO history VALUES (
+                'legacy-history', '2026-01-01T00:00:00+00:00', 'legacy',
+                '旧配置', 'powershell', 'python tool.py', '{}'
+            );
             """
         )
 
     migrated = Storage(database)
     assert migrated.get_profile("legacy").invocation_mode == "script"
+    assert migrated.get_history("legacy-history").note == ""
     Storage(database)
     with sqlite3.connect(database) as connection:
         assert connection.execute(
             "SELECT value FROM metadata WHERE key = 'schema_version'"
         ).fetchone()[0] == "2"
         columns = {row[1] for row in connection.execute("PRAGMA table_info(profiles)")}
+        history_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(history)")
+        }
     assert "invocation_mode" in columns
+    assert "note" in history_columns
 
 
 def test_imports_v1_backup_as_script(storage: Storage):
     profile = storage.create_profile(payload())
+    storage.add_history(profile, build_command(profile))
     backup_data = storage.export_backup().model_dump(mode="json")
     backup_data["schema_version"] = 1
     backup_data["profiles"][0].pop("invocation_mode")
+    backup_data["history"][0].pop("note")
 
     restored = Storage(storage.database_path.parent / "v1-restored.sqlite3")
     from command_builder.models import BackupData
 
     restored.import_backup(BackupData.model_validate(backup_data), ImportMode.REPLACE)
     assert restored.list_profiles()[0].invocation_mode == "script"
+    assert restored.list_history()[0].note == ""

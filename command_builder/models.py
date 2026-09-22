@@ -128,7 +128,14 @@ class HistoryEntry(BaseModel):
     profile_name: str
     shell: ShellTarget
     command: str
+    note: str = Field(default="", max_length=500)
     snapshot: dict[str, Any]
+
+
+class HistoryNoteUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    note: str = Field(default="", max_length=500)
 
 
 class GenerateResult(BaseModel):

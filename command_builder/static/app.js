@@ -686,6 +686,65 @@ async function loadHistory() {
   renderHistory(history);
 }
 
+function enableHistoryNoteAutoSave(input, item) {
+  let savedValue = item.note || "";
+  let saveTimer = null;
+  let saveInFlight = false;
+  let needsSave = false;
+
+  const flush = async () => {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    if (saveInFlight || !needsSave) return;
+    const note = input.value;
+    needsSave = false;
+    if (note === savedValue) {
+      input.classList.remove("saving", "save-error");
+      input.title = "备注会自动保存";
+      return;
+    }
+
+    saveInFlight = true;
+    input.classList.add("saving");
+    input.title = "正在保存备注";
+    try {
+      const saved = await api(`/api/history/${item.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ note }),
+      });
+      savedValue = saved.note;
+      item.note = saved.note;
+      input.classList.remove("save-error");
+      if (input.value !== savedValue) needsSave = true;
+      else {
+        input.classList.remove("saving");
+        input.title = "备注已自动保存";
+      }
+    } catch (error) {
+      input.classList.remove("saving");
+      input.classList.add("save-error");
+      input.title = "备注保存失败，继续编辑可重试";
+      handleError(new Error(`备注保存失败：${error.message}`));
+    } finally {
+      saveInFlight = false;
+      if (needsSave) saveTimer = setTimeout(flush, 0);
+    }
+  };
+
+  input.addEventListener("input", () => {
+    needsSave = true;
+    input.classList.remove("save-error");
+    input.classList.add("saving");
+    input.title = "备注将在停止输入后自动保存";
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, 450);
+  });
+  input.addEventListener("change", () => {
+    needsSave = true;
+    flush();
+  });
+}
+
 function renderHistory(history) {
   elements.historyList.replaceChildren();
   if (!history.length) {
@@ -702,9 +761,19 @@ function renderHistory(history) {
     meta.className = "history-meta";
     const name = document.createElement("strong");
     name.textContent = item.profile_name;
+    name.title = item.profile_name;
+    const note = document.createElement("input");
+    note.className = "history-note";
+    note.type = "text";
+    note.maxLength = 500;
+    note.placeholder = "备注";
+    note.value = item.note || "";
+    note.title = "备注会自动保存";
+    note.setAttribute("aria-label", `${item.profile_name} 的历史备注`);
+    enableHistoryNoteAutoSave(note, item);
     const time = document.createElement("time");
     time.textContent = new Date(item.created_at).toLocaleString();
-    meta.append(name, time);
+    meta.append(name, note, time);
     const command = document.createElement("div");
     command.className = "history-command";
     command.textContent = item.command;

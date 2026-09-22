@@ -13,6 +13,7 @@ from .models import (
     CommandDraft,
     GenerateResult,
     HistoryEntry,
+    HistoryNoteUpdate,
     ImportRequest,
     ImportResult,
     ParseCommandRequest,
@@ -133,6 +134,15 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     ) -> list[HistoryEntry]:
         return storage.list_history(query=q.strip(), limit=limit)
 
+    @application.patch("/api/history/{history_id}", response_model=HistoryEntry)
+    def update_history_note(
+        history_id: str, payload: HistoryNoteUpdate
+    ) -> HistoryEntry:
+        history = storage.update_history_note(history_id, payload.note)
+        if history is None:
+            raise HTTPException(status_code=404, detail="找不到该历史记录")
+        return history
+
     @application.delete(
         "/api/history/{history_id}", status_code=status.HTTP_204_NO_CONTENT
     )
@@ -166,13 +176,12 @@ def create_app(database_path: Path | None = None) -> FastAPI:
             "",
         ]
         for item in reversed(backup.history):
-            lines.extend(
-                [
-                    f"[{item.created_at.isoformat()}] {item.profile_name} ({item.shell.value})",
-                    item.command,
-                    "",
-                ]
+            lines.append(
+                f"[{item.created_at.isoformat()}] {item.profile_name} ({item.shell.value})"
             )
+            if item.note:
+                lines.append(f"# 备注: {item.note}")
+            lines.extend([item.command, ""])
         return Response(
             content="\n".join(lines),
             media_type="text/plain; charset=utf-8",

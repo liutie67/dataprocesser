@@ -36,15 +36,36 @@ def test_profile_generate_history_and_exports(tmp_path: Path):
         history = client.get("/api/history")
         assert len(history.json()) == 1
         assert history.json()[0]["profile_name"] == "testbench"
+        assert history.json()[0]["note"] == ""
+
+        history_id = history.json()[0]["id"]
+        noted = client.patch(
+            f"/api/history/{history_id}", json={"note": "关键性能参数"}
+        )
+        assert noted.status_code == 200
+        assert noted.json()["note"] == "关键性能参数"
+        assert client.get("/api/history", params={"q": "关键性能"}).json()[0][
+            "id"
+        ] == history_id
 
         json_export = client.get("/api/export/json")
         assert json_export.status_code == 200
         assert json_export.json()["schema_version"] == 2
+        assert json_export.json()["history"][0]["note"] == "关键性能参数"
         assert "attachment" in json_export.headers["content-disposition"]
 
         txt_export = client.get("/api/export/txt")
         assert txt_export.status_code == 200
+        assert "# 备注: 关键性能参数" in txt_export.text
         assert r"python .\testbench.py --budget 120" in txt_export.text
+
+
+def test_update_history_note_validation_and_missing_record(tmp_path: Path):
+    with TestClient(create_app(tmp_path / "history-note.sqlite3")) as client:
+        assert client.patch("/api/history/missing", json={"note": "备注"}).status_code == 404
+        assert client.patch(
+            "/api/history/missing", json={"note": "x" * 501}
+        ).status_code == 422
 
 
 def test_import_merge_and_replace(tmp_path: Path):
